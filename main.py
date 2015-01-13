@@ -74,7 +74,7 @@ class ReadRaw:
         self.ctrlgrp = ctrlgrp
 
         # select subgroups
-        if diets == False:
+        if diets == False:  # select all diet groups
             self.data = self.rawdata
         else:
             self.data = self.rawdata[np.in1d(self.rawdata['diet'], diets)]
@@ -266,7 +266,7 @@ if __name__ == '__main__':
 
     np.random.seed(3)   #set random seed
 
-    mousediet = ReadRaw('mouse_weights_nomiss.txt', [99, 27])
+    mousediet = ReadRaw('mouse_weights_nomiss.txt', diets = [99, 27])
     mousediet.setParams(p=2, l=1)
 
     # set priors

@@ -559,7 +559,7 @@ class GammaPosterior:
             return np.sqrt(1.0/det(temp_xTx))*np.exp(np.dot(temp_xTphi.T,
                    np.dot(pinv(temp_xTx), temp_xTphi))/(2.0*self.sigma2))
         else: # all gammas are 0
-            return 1.0
+            return 0.0
 
     def getUpdates(self):
         for gdx in range(self.grp):
@@ -567,11 +567,17 @@ class GammaPosterior:
                 temp_gamma = self.gamma[gdx, :]
                 temp_gamma[l] = np.random.binomial(1, self.pai[gdx])
                 if temp_gamma[l] != self.gamma[gdx, l]:
-                    S_temp = self._S(gdx, temp)
+                    S_temp = self._S(gdx, temp = temp_gamma)
                     S = self._S(gdx)
-                    hasting_ratio = (2*np.pi*self.sigma2)**\
-                                (0.5*(temp_gamma[l] - self.gamma[gdx, l]))*\
-                                S_temp/S
+                    if S != 0:
+                        hasting_ratio = (2*np.pi*self.sigma2)**\
+                                    (0.5*(temp_gamma[l] - self.gamma[gdx, l]))*\
+                                    S_temp/S
+                    else:
+                        # only denominator == 0
+                        # note that denominator and nominator cannot be both 0,
+                        # since temp_gamma != gamma
+                        hasting_ratio = 1.0
                     u = np.random.uniform()
                     if hasting_ratio > u:
                         self.gamma[gdx, l] = temp_gamma[l]

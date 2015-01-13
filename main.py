@@ -140,15 +140,17 @@ class ReadRaw:
             self.id_y.update({i:
                 self.data['weight'][tracker].reshape(np.sum(tracker), 1)})
             self.id_W.update({i: self._designMatrix(p, tracker)})
-            self.id_X.update({i: self._designMatrix(l, tracker)})
+            self.id_X.update({i: self._designMatrix(l, tracker, is_X=True)})
         self.id_Z = self.id_W.copy()
 
-    def _designMatrix(self, p, tracker):
+    def _designMatrix(self, p, tracker, is_X=False):
         """Build design matrix based on order p."""
         temp1 = np.ones([1, np.sum(tracker)])
         for pv in range(p-1):
             temp2 = self.data['days'][tracker].reshape(1, np.sum(tracker))**pv
             temp1 = np.vstack([temp1, temp2])
+        if is_X: # if it is the design matrix for X, eliminates all 1's
+            temp1 = temp1[1:, ]
         return temp1.T
 
 
@@ -207,7 +209,7 @@ def mcmcrun(data, priors, dirname):
 
     # MCMC updates
     totSimulation = 1000
-    counter = 0
+    counter = 1
     while(counter < totSimulation):
         counter += 1
         print counter

@@ -18,7 +18,7 @@ from numpy.linalg import pinv
 import pandas as pd
 import postdist
 
-class ReadRaw:
+class WeightsData:
     """
     Read raw data from .txt file and extract information related to modeling.
 
@@ -139,11 +139,11 @@ class ReadRaw:
             self.id_ntot.update({i: np.sum(tracker)})
             self.id_y.update({i:
                 self.data['weight'][tracker].reshape(np.sum(tracker), 1)})
-            self.id_W.update({i: self._designMatrix(p, tracker)})
-            self.id_X.update({i: self._designMatrix(l+1, tracker, is_X=True)})
+            self.id_W.update({i: self._designMatrix_(p, tracker)})
+            self.id_X.update({i: self._designMatrix_(l+1, tracker, is_X=True)})
         self.id_Z = self.id_W.copy()
 
-    def _designMatrix(self, p, tracker, is_X=False):
+    def _designMatrix_(self, p, tracker, is_X=False):
         """Build design matrix based on order p."""
         temp1 = np.zeros([1, np.sum(tracker)])
         for pv in range(p):
@@ -182,7 +182,7 @@ def mcmcrun(data, priors, dirname):
 
     Parameters
     ----------
-    data: ReadRaw object
+    data: WeightsData object
         Contains information summarized from raw data.
 
     dirname: string
@@ -196,13 +196,13 @@ def mcmcrun(data, priors, dirname):
     def initParams(data):
         '''Initialize parameters from fitted mixed effects model in R.'''
         params = postdist.ParamsHolder()
-        params.setAlpha(np.array([50.979240, -5.563603]).reshape(data.p, 1))
+        params.setAlpha(np.array([51.24, -5.75]).reshape(data.p, 1))
         params.setBeta(np.ones([data.grp, data.l]))
         params.setGamma(np.ones([data.grp, data.l]))
-        params.setLambdaD(np.array(0.05340017).reshape(1, 1))
+        params.setLambdaD(np.array(0.21).reshape(1, 1))
         params.setB(np.random.normal(0, 1.0/params.lambdaD,
                     size = data.ntot*data.p).reshape(data.ntot, data.p))
-        params.setSigma2(np.array(2.248769**2).reshape(1, 1))
+        params.setSigma2(np.array(5.06).reshape(1, 1))
         return params
 
     # initialize parameters
@@ -210,7 +210,7 @@ def mcmcrun(data, priors, dirname):
     params = temp_params.toArray(data.ntot, data.grp, data.p, data.l)
 
     # MCMC updates
-    totSimulation = 1000
+    totSimulation = 10000
     counter = 1
     while(counter < totSimulation):
         print counter
@@ -266,16 +266,16 @@ if __name__ == '__main__':
 
     np.random.seed(3)   #set random seed
 
-    mousediet = ReadRaw('mouse_weights_nomiss.txt', diets = [99, 27])
+    mousediet = WeightsData('mouse_weights_nomiss.txt', diets = [99, 27])
     mousediet.setParams(p=2, l=1)
 
     # set priors
     priors = PriorParams()
-    priors.setD1(122.3124)
-    priors.setD2(2275.353)
-    priors.setD3(np.array([50.979240, -5.563603]).reshape(mousediet.p, 1))
-    priors.setD4(pinv(np.array([0.13397276, -0.07849482,-0.07849482,
-                        0.05860082]).reshape(mousediet.p, mousediet.p)))
+    priors.setD1(46.07)
+    priors.setD2(214.66)
+    priors.setD3(np.array([51.24, -5.75]).reshape(mousediet.p, 1))
+    priors.setD4(pinv(np.array([0.13, -0.08, -0.08,
+                        0.06]).reshape(mousediet.p, mousediet.p)))
     priors.setPai(0.5*np.ones(mousediet.grp))
 
     mcmcrun(mousediet, priors, dirname)

@@ -80,7 +80,7 @@ class AlphaPosterior:
 
     Parameters
     ----------
-    data: a ReadRaw object
+    data: a WeightsData object
         Contains all information from the raw data set.
 
     params: a ParamsHolder object
@@ -188,7 +188,7 @@ class BPosterior:
 
     Parameters
     ----------
-    data: a ReadRaw object
+    data: a WeightsData object
         Contains all information from the raw data set.
 
     params: a ParamsHolder object
@@ -305,7 +305,7 @@ class BetaPosterior:
 
     Parameters
     ----------
-    data: a ReadRaw object
+    data: a WeightsData object
         Contains all information from the raw data set.
 
     params: a ParamsHolder object
@@ -385,7 +385,7 @@ class LambdaDPosterior:
 
     Parameters
     ----------
-    data: a ReadRaw object
+    data: a WeightsData object
         Contains all information from the raw data set.
 
     params: a ParamsHolder object
@@ -435,7 +435,7 @@ class Sigma2Posterior:
 
     Parameters
     ----------
-    data: a ReadRaw object
+    data: a WeightsData object
         Contains all information from the raw data set.
 
     params: a ParamsHolder object
@@ -505,7 +505,7 @@ class GammaPosterior:
 
     Parameters
     ----------
-    data: a ReadRaw object
+    data: a WeightsData object
         Contains all information from the raw data set.
 
     params: a ParamsHolder object

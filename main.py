@@ -199,7 +199,7 @@ def mcmcrun(data, priors, dirname):
         params.setAlpha(np.array([51.24, -5.75]).reshape(data.p, 1))
         params.setBeta(np.ones([data.grp, data.l]))
         params.setGamma(np.ones([data.grp, data.l]))
-        params.setLambdaD(np.array(0.21).reshape(1, 1))
+        params.setLambdaD(np.array(0.04).reshape(1, 1))
         params.setB(np.random.normal(0, 1.0/params.lambdaD,
                     size = data.ntot*data.p).reshape(data.ntot, data.p))
         params.setSigma2(np.array(5.06).reshape(1, 1))
@@ -210,42 +210,41 @@ def mcmcrun(data, priors, dirname):
     params = temp_params.toArray(data.ntot, data.grp, data.p, data.l)
 
     # MCMC updates
-    totSimulation = 10000
+    totSimulation = 5000
     counter = 1
     while(counter < totSimulation):
         print counter
         counter += 1
-
-        ## Gibbs sampler
-        # update alpha
-        alpha_pd = postdist.AlphaPosterior(data, temp_params, priors)
-        temp_params.alpha = alpha_pd.getUpdates()
-        # print temp_params.alpha.shape
-
-        # update beta
-        beta_pd = postdist.BetaPosterior(data, temp_params)
-        temp_params.beta = beta_pd.getUpdates()
-        # print temp_params.beta.shape
 
         # update gamma
         gamma_pd = postdist.GammaPosterior(data, temp_params, priors)
         temp_params.gamma = gamma_pd.getUpdates()
         # print temp_params.gamma.shape
 
+        # update beta
+        beta_pd = postdist.BetaPosterior(data, temp_params)
+        temp_params.beta = beta_pd.getUpdates()
+        # print temp_params.beta.shape
+
+        # update alpha
+        alpha_pd = postdist.AlphaPosterior(data, temp_params, priors)
+        temp_params.alpha = alpha_pd.getUpdates()
+        # print temp_params.alpha.shape
+
         # update lambdaD
         lambdaD_pd = postdist.LambdaDPosterior(data, temp_params, priors)
         temp_params.lambdaD = lambdaD_pd.getUpdates()
         # print temp_params.lambdaD.shape
 
-        # update b
-        b_pd = postdist.BPosterior(data, temp_params)
-        temp_params.b = b_pd.getUpdates()
-        # print temp_params.b.shape
-
         # update sigma2
         sigma2_pd = postdist.Sigma2Posterior(data, temp_params)
         temp_params.sigma2 = sigma2_pd.getUpdates()
         # print temp_params.sigma2.shape
+
+        # update b
+        b_pd = postdist.BPosterior(data, temp_params)
+        temp_params.b = b_pd.getUpdates()
+        # print temp_params.b.shape
 
         # store updates
         params = np.hstack([params,
@@ -271,8 +270,8 @@ if __name__ == '__main__':
 
     # set priors
     priors = PriorParams()
-    priors.setD1(46.07)
-    priors.setD2(214.66)
+    priors.setD1(5.52)
+    priors.setD2(105.04)
     priors.setD3(np.array([51.24, -5.75]).reshape(mousediet.p, 1))
     priors.setD4(pinv(np.array([0.13, -0.08, -0.08,
                         0.06]).reshape(mousediet.p, mousediet.p)))

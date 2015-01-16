@@ -227,8 +227,8 @@ def mcmcrun(data, priors, dirname):
         # print temp_params.beta.shape
 
         # update alpha
-        alpha_pd = postdist.AlphaPosterior(data, temp_params, priors)
-        temp_params.alpha = alpha_pd.getUpdates()
+        # alpha_pd = postdist.AlphaPosterior(data, temp_params, priors)
+        # temp_params.alpha = alpha_pd.getUpdates()
         # print temp_params.alpha.shape
 
         # update lambdaD

@@ -112,7 +112,7 @@ class AlphaPosterior:
         for gdx in range(data.grp):
             g = data.unidiets[gdx]
             nzro_gamma = (params.gamma[gdx,:]!=0)
-            try:
+            if nzro_gamma.any(): # not all 0's
                 temp1 = np.zeros([np.sum(nzro_gamma), np.sum(nzro_gamma)])
                 temp2 = np.zeros([np.sum(nzro_gamma), data.p])
                 for i in data.grp_uniids[g]:
@@ -123,7 +123,7 @@ class AlphaPosterior:
                 temp1 = pinv(temp1)
                 self.__inv_xxsum__.update({g: temp1})
                 self.__xwsum__.update({g: temp2})
-            except:
+            else: # all gammas are 0
                 pass
 
     def _mean_(self, data, params, priors):
@@ -215,22 +215,29 @@ class BPosterior:
     def _partialInit_(self, data, params):
         '''Pre-calculate common components.'''
         self.__inv_xxsum__ = {}
+        self.__xTphi__ = {}
         self.__xTz__ = {}
         for gdx in range(data.grp):
             g = data.unidiets[gdx]
             nzro_gamma = (params.gamma[gdx,:]!=0)
-            try:
-                temp = np.zeros([np.sum(nzro_gamma), np.sum(nzro_gamma)])
+            if nzro_gamma.any(): # not all 0's
+                temp1 = np.zeros([np.sum(nzro_gamma), np.sum(nzro_gamma)])
+                temp2 = np.zeros([np.sum(nzro_gamma), 1])
                 for i in data.grp_uniids[g]:
-                    temp += np.dot(data.id_X[i][:, nzro_gamma].T,
-                                   data.id_X[i][:, nzro_gamma])
+                    idx = np.where(data.uniids == i)[0][0]
+                    temp1 += np.dot(data.id_X[i][:, nzro_gamma].T,
+                                    data.id_X[i][:, nzro_gamma])
+                    temp2 += np.dot(data.id_X[i][:, nzro_gamma].T,
+                                    data.id_y[i] - \
+                                    np.dot(data.id_W[i], params.alpha) - \
+                                    np.dot(data.id_Z[i],
+                                           params.b[idx,:][:, np.newaxis]))
                     self.__xTz__.update({i:
                                       np.dot(data.id_X[i][:, nzro_gamma].T,
                                       data.id_Z[i])})
-                temp = pinv(temp)
-                self.__inv_xxsum__.update({g: temp})
-            except:
-                pass
+                temp1 = pinv(temp1)
+                self.__inv_xxsum__.update({g: temp1})
+                self.__xTphi__.update({g: temp2})
 
     def _cov_(self, data, params):
         '''Calculate covariance matrix of the posteriors.'''
@@ -244,12 +251,14 @@ class BPosterior:
                                 np.dot(self.__inv_xxsum__[g], self.__xTz__[i]))
                     V2 = V2/data.grp_dtot[g] + \
                          np.dot(data.id_Z[i].T, data.id_Z[i])
-                    V2 = V2/params.sigma2 + params.lambdaD
+                    V2 = V2/params.sigma2
+                    np.fill_diagonal(V2, V2.diagonal() + params.lambdaD)
                     self.cov.update({i: pinv(V2)})
             else: # all gammas are 0
                 for i in data.grp_uniids[g]:
                     V2 = np.dot(data.id_Z[i].T, data.id_Z[i])
-                    V2 = V2/params.sigma2 + params.lambdaD
+                    V2 = V2/params.sigma2
+                    np.fill_diagonal(V2, V2.diagonal() + params.lambdaD)
                     self.cov.update({i: pinv(V2)})
 
     def _mean_(self, data, params):
@@ -261,14 +270,7 @@ class BPosterior:
             if nzro_gamma.any(): # not all 0's
                 for i in data.grp_uniids[g]:
                     idx = np.where(data.uniids == i)[0][0]
-                    temp1 = np.zeros([np.sum(nzro_gamma), 1])
-                    for j in data.grp_uniids[g]:
-                        jdx = np.where(data.uniids == j)[0][0]
-                        temp1 += np.dot(data.id_X[j][:, nzro_gamma].T,
-                                        data.id_y[j] - \
-                                        np.dot(data.id_W[j], params.alpha) - \
-                                        np.dot(data.id_Z[j],
-                                               params.b[jdx,:][:, np.newaxis]))
+                    temp1 = self.__xTphi__[g].copy()
                     temp1 += np.dot(self.__xTz__[i],
                                     params.b[idx,:][:, np.newaxis])
                     temp1 = np.dot(self.__xTz__[i].T,
@@ -341,8 +343,8 @@ class BetaPosterior:
                 for i in data.grp_uniids[g]:
                     temp += np.dot(data.id_X[i][:, nzro_gamma].T,
                                    data.id_X[i][:, nzro_gamma])
-                temp = (data.grp_dtot[g] + 1.0/data.grp_dtot[g])*temp
-                self.cov.update({g: pinv(temp)*params.sigma2})
+                temp = (1.0 + 1.0/data.grp_dtot[g])*temp/params.sigma2
+                self.cov.update({g: pinv(temp)})
             else: # all gammas are 0
                 pass
 
@@ -370,12 +372,10 @@ class BetaPosterior:
         samples = np.zeros(self.__shape__)
         for gdx in range(self.__shape__[0]):
             g = self.__unidiets__[gdx]
-            try:
+            if self.__nzro_gamma__[g].any(): # not all 0's
                 samples[gdx, self.__nzro_gamma__[g]] = \
                     np.random.multivariate_normal(self.mean[g][:,0],
                                                   self.cov[g])
-            except:
-                pass
         return samples
 
 
@@ -462,15 +462,15 @@ class Sigma2Posterior:
 
     def _scale_(self, data, params):
         '''Calculate the scale parameter of the posterior.'''
-        self.scale = 0
+        self.scale = 0.0
         for gdx in range(data.grp):
             g = data.unidiets[gdx]
             nzro_gamma = (params.gamma[gdx,:]!=0)
             if nzro_gamma.any(): # not all 0's
                 temp_beta = params.beta[gdx, nzro_gamma][:, np.newaxis]
-                temp1 = 0
-                temp2 = 0
-                temp3 = 0
+                temp1 = 0.0
+                temp2 = 0.0
+                temp3 = 0.0
                 for i in data.grp_uniids[g]:
                     idx = np.where(data.uniids == i)[0][0]
                     temp_x = data.id_X[i][:, nzro_gamma]
@@ -482,10 +482,10 @@ class Sigma2Posterior:
                     temp2 += np.dot(temp_x.T, temp_x)
                     temp3 += np.dot(temp_x.T, temp4)
                 temp5 = temp_beta - np.dot(pinv(temp2), temp3)
-                self.scale += temp1 + np.dot(temp5.T,
-                                      np.dot(temp2, temp5))/data.grp_dtot[g]
+                self.scale += (temp1 + np.dot(temp5.T,
+                                      np.dot(temp2, temp5))/data.grp_dtot[g])
             else: # all gammas are 0
-                temp1 = 0
+                temp1 = 0.0
                 for i in data.grp_uniids[g]:
                     idx = np.where(data.uniids == i)[0][0]
                     temp4 = data.id_y[i] - np.dot(data.id_W[i], params.alpha)-\
@@ -496,7 +496,7 @@ class Sigma2Posterior:
         self.scale = self.scale/2.0
 
     def getUpdates(self):
-        return invgamma.rvs(a = self.a, scale = self.scale)
+        return invgamma.rvs(a = self.a, scale = self.scale, size = 1)
 
 
 class GammaPosterior:
@@ -534,6 +534,7 @@ class GammaPosterior:
         self.b = params.b
         self.gamma = params.gamma
         self.sigma2 = params.sigma2
+        self.ctrlidx = data.ctrlidx
 
     def _S_(self, gdx, temp = None):
         '''Calculate the S function.'''
@@ -563,22 +564,23 @@ class GammaPosterior:
 
     def getUpdates(self):
         for gdx in range(self.grp):
-            for l in range(self.l):
-                temp_gamma = self.gamma[gdx, :]
-                temp_gamma[l] = np.random.binomial(1, self.pai[gdx])
-                if temp_gamma[l] != self.gamma[gdx, l]:
-                    S_temp = self._S_(gdx, temp = temp_gamma)
-                    S = self._S_(gdx)
-                    if S != 0:
-                        hasting_ratio = (2*np.pi*self.sigma2)**\
-                                    (0.5*(temp_gamma[l] - self.gamma[gdx, l]))*\
-                                    S_temp/S
-                    else:
-                        # only denominator == 0
-                        # note that denominator and nominator cannot be both 0,
-                        # since temp_gamma != gamma
-                        hasting_ratio = 1.0
-                    u = np.random.uniform()
-                    if hasting_ratio > u:
-                        self.gamma[gdx, l] = temp_gamma[l]
+            if gdx != self.ctrlidx: # do not update control group
+                for l in range(self.l):
+                    temp_gamma = self.gamma[gdx, :]
+                    temp_gamma[l] = np.random.binomial(1, self.pai[gdx])
+                    if temp_gamma[l] != self.gamma[gdx, l]:
+                        S_temp = self._S_(gdx, temp = temp_gamma)
+                        S = self._S_(gdx)
+                        if S != 0:
+                            hasting_ratio = (2*np.pi*self.sigma2)**\
+                                (0.5*(temp_gamma[l] - self.gamma[gdx, l]))*\
+                                        S_temp/S
+                        else:
+                            # only denominator == 0
+                            # denominator and nominator cannot all be 0
+                            # since temp_gamma != gamma
+                            hasting_ratio = 1.0
+                        u = np.random.uniform()
+                        if hasting_ratio > u:
+                            self.gamma[gdx, l] = temp_gamma[l]
         return self.gamma

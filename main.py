@@ -70,8 +70,7 @@ class WeightsData:
     """
     def __init__(self, filename, diets = False, ctrlgrp = 99):
         self.rawdata = pd.read_csv(filename, sep=" ")
-        self.rawdata['days'] = self.rawdata['days']/365.0 # scale days
-        self.ctrlgrp = ctrlgrp
+        self.rawdata['days'] = self.rawdata['days']/365.0 - 1.0 # scale days
 
         # select subgroups
         if diets == False:  # select all diet groups
@@ -82,6 +81,7 @@ class WeightsData:
         # set parameters
         self.unidays = np.unique(self.data['days'])
         self.unidiets = np.unique(self.data['diet'])
+        self.ctrlidx = np.where(self.unidiets == ctrlgrp)[0][0]
         self.uniids = np.unique(self.data['id'])
         self.grp = self.unidiets.size # total number of diets
         self.ntot = self.uniids.size # total number of mouse
@@ -90,8 +90,9 @@ class WeightsData:
         self.grp_dtot = {}
         for g in self.unidiets:
             temp = self.data['id'][self.data['diet']==g]
-            self.grp_dtot.update({g: temp.size})
             self.grp_uniids.update({g: np.unique(temp)})
+            # self.grp_dtot.update({g: temp.size})
+            self.grp_dtot.update({g: self.grp_uniids[g].size})
             self.grp_ntot.update({g: self.grp_uniids[g].size})
 
     def setParams(self, p = 2, l = 1):
@@ -196,11 +197,11 @@ def mcmcrun(data, priors, dirname):
     def initParams(data):
         '''Initialize parameters from fitted mixed effects model in R.'''
         params = postdist.ParamsHolder()
-        params.setAlpha(np.array([51.24, -5.75]).reshape(data.p, 1))
-        params.setBeta(np.ones([data.grp, data.l]))
-        params.setGamma(np.ones([data.grp, data.l]))
-        params.setLambdaD(np.array(0.04).reshape(1, 1))
-        params.setB(np.random.normal(0, 1.0/params.lambdaD,
+        params.setAlpha(np.array([45.50, -5.75]).reshape(data.p, 1))
+        params.setBeta(np.zeros([data.grp, data.l]))
+        params.setGamma(np.zeros([data.grp, data.l]))
+        params.setLambdaD(np.array(0.086).reshape(1, 1))
+        params.setB(np.random.normal(0, np.sqrt(1.0/params.lambdaD),
                     size = data.ntot*data.p).reshape(data.ntot, data.p))
         params.setSigma2(np.array(5.06).reshape(1, 1))
         return params
@@ -210,10 +211,9 @@ def mcmcrun(data, priors, dirname):
     params = temp_params.toArray(data.ntot, data.grp, data.p, data.l)
 
     # MCMC updates
-    totSimulation = 5000
-    counter = 1
+    totSimulation = 1000
+    counter = 0
     while(counter < totSimulation):
-        print counter
         counter += 1
 
         # update gamma
@@ -227,8 +227,8 @@ def mcmcrun(data, priors, dirname):
         # print temp_params.beta.shape
 
         # update alpha
-        # alpha_pd = postdist.AlphaPosterior(data, temp_params, priors)
-        # temp_params.alpha = alpha_pd.getUpdates()
+        alpha_pd = postdist.AlphaPosterior(data, temp_params, priors)
+        temp_params.alpha = alpha_pd.getUpdates()
         # print temp_params.alpha.shape
 
         # update lambdaD
@@ -246,18 +246,24 @@ def mcmcrun(data, priors, dirname):
         temp_params.b = b_pd.getUpdates()
         # print temp_params.b.shape
 
+        # print "Mean is {0} and Cov is {1}".format(b_pd.mean, b_pd.cov)
+        # print "New b's are {0}".format(temp_params.b)
+        # raw_input("Press Enter to Continue ...")
+
         # store updates
         params = np.hstack([params,
                 temp_params.toArray(data.ntot, data.grp, data.p, data.l)])
 
         # write to file
         np.savetxt(dirname+"/updates.txt", params, delimiter=',')
+        # np.savetxt(dirname+"/counter.txt", counter, delimiter=',')
 
 
 if __name__ == '__main__':
     # make new dir as input to store results
     if len(sys.argv) >= 2:
         dirname = sys.argv[1]
+        datafile = sys.argv[2]
         try:
             os.mkdir(dirname)   #make new directory
         except OSError:
@@ -265,16 +271,18 @@ if __name__ == '__main__':
 
     np.random.seed(3)   #set random seed
 
-    mousediet = WeightsData('mouse_weights_nomiss.txt', diets = [99, 27])
+    # mousediet = WeightsData('mouse_weights_nomiss.txt', diets = [99, 27])
+    mousediet = WeightsData(datafile, diets = [99, 1])
+
     mousediet.setParams(p=2, l=1)
 
     # set priors
     priors = PriorParams()
-    priors.setD1(5.52)
-    priors.setD2(105.04)
-    priors.setD3(np.array([51.24, -5.75]).reshape(mousediet.p, 1))
-    priors.setD4(pinv(np.array([0.13, -0.08, -0.08,
-                        0.06]).reshape(mousediet.p, mousediet.p)))
+    priors.setD1(75.95)
+    priors.setD2(871.47)
+    priors.setD3(np.array([45.50, -5.75]).reshape(mousediet.p, 1))
+    priors.setD4(pinv(np.array([0.04, -0.02, -0.02,
+                                0.06]).reshape(mousediet.p, mousediet.p)))
     priors.setPai(0.5*np.ones(mousediet.grp))
 
     mcmcrun(mousediet, priors, dirname)

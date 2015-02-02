@@ -91,8 +91,8 @@ class WeightsData:
         for g in self.unidiets:
             temp = self.data['id'][self.data['diet']==g]
             self.grp_uniids.update({g: np.unique(temp)})
-            # self.grp_dtot.update({g: temp.size})
-            self.grp_dtot.update({g: self.grp_uniids[g].size})
+            self.grp_dtot.update({g: temp.size})
+            # self.grp_dtot.update({g: self.grp_uniids[g].size})
             self.grp_ntot.update({g: self.grp_uniids[g].size})
 
     def setParams(self, p = 2, l = 1):

@@ -496,6 +496,7 @@ class Sigma2Posterior:
         self.scale = self.scale/2.0
 
     def getUpdates(self):
+        print "a = {0}, scale = {1}".format(self.a, self.scale)
         return invgamma.rvs(a = self.a, scale = self.scale, size = 1)
 
 

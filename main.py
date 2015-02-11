@@ -91,8 +91,9 @@ class WeightsData:
         for g in self.unidiets:
             temp = self.data['id'][self.data['diet']==g]
             self.grp_uniids.update({g: np.unique(temp)})
+            # number of total number of measurements in a group
             self.grp_dtot.update({g: temp.size})
-            # self.grp_dtot.update({g: self.grp_uniids[g].size})
+            # number of unique ids in a group
             self.grp_ntot.update({g: self.grp_uniids[g].size})
 
     def setParams(self, p = 2, l = 1):
@@ -224,22 +225,22 @@ def mcmcrun(data, priors, dirname):
         # update beta
         beta_pd = postdist.BetaPosterior(data, temp_params)
         temp_params.beta = beta_pd.getUpdates()
-        # print temp_params.beta.shape
+        print "====beta (control & treatment): \n{0}".format(temp_params.beta)
 
         # update alpha
         alpha_pd = postdist.AlphaPosterior(data, temp_params, priors)
         temp_params.alpha = alpha_pd.getUpdates()
-        # print temp_params.alpha.shape
+        print "====alpha: \n{0}".format(temp_params.alpha)
 
         # update lambdaD
         lambdaD_pd = postdist.LambdaDPosterior(data, temp_params, priors)
         temp_params.lambdaD = lambdaD_pd.getUpdates()
-        # print temp_params.lambdaD.shape
+        # print temp_params.lambdaD
 
         # update sigma2
         sigma2_pd = postdist.Sigma2Posterior(data, temp_params)
         temp_params.sigma2 = sigma2_pd.getUpdates()
-        # print temp_params.sigma2.shape
+        print "====sigma2: \n{0}".format(temp_params.sigma2)
 
         # update b
         b_pd = postdist.BPosterior(data, temp_params)
@@ -248,7 +249,7 @@ def mcmcrun(data, priors, dirname):
 
         # print "Mean is {0} and Cov is {1}".format(b_pd.mean, b_pd.cov)
         # print "New b's are {0}".format(temp_params.b)
-        # raw_input("Press Enter to Continue ...")
+        raw_input("Press Enter to Continue ...")
 
         # store updates
         params = np.hstack([params,
@@ -267,12 +268,13 @@ if __name__ == '__main__':
         try:
             os.mkdir(dirname)   #make new directory
         except OSError:
-            print "\n" + dirname + "/\tALREADY EXISTS...\nFILES ARE WRITTEN..."
+            print "\n" + dirname + \
+                            "/\tALREADY EXISTS...\nFILES ARE REWRITTEN..."
 
     np.random.seed(3)   #set random seed
 
     # mousediet = WeightsData('mouse_weights_nomiss.txt', diets = [99, 27])
-    mousediet = WeightsData(datafile, diets = [99, 1])
+    mousediet = WeightsData(datafile, diets = [99, 1], ctrlgrp = 99)
 
     mousediet.setParams(p=2, l=1)
 

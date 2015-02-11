@@ -146,7 +146,7 @@ class AlphaPosterior:
                     temp3 += np.dot(data.id_X[i][:, nzro_gamma].T, temp4)
                 temp1 += temp2 + \
                          np.dot(self.__xwsum__[g].T,
-                          np.dot(self.__inv_xxsum__[g], temp3))/data.grp_dtot[g]
+                         np.dot(self.__inv_xxsum__[g], temp3))/data.grp_dtot[g]
             else: # all gammas are 0
                 for i in data.grp_uniids[g]:
                     idx = np.where(data.uniids == i)[0][0]
@@ -496,7 +496,6 @@ class Sigma2Posterior:
         self.scale = self.scale/2.0
 
     def getUpdates(self):
-        print "a = {0}, scale = {1}".format(self.a, self.scale)
         return invgamma.rvs(a = self.a, scale = self.scale, size = 1)
 
 

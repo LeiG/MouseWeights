@@ -117,9 +117,9 @@ class AlphaPosterior:
                 temp2 = np.zeros([np.sum(nzro_gamma), data.p])
                 for i in data.grp_uniids[g]:
                     temp1 += np.dot(data.id_X[i][:, nzro_gamma].T,
-                                    data.id_X[i][:, nzro_gamma])
+                                    data.id_X[i][:, nzro_gamma])/data.id_dtot[i]
                     temp2 += np.dot(data.id_X[i][:, nzro_gamma].T,
-                                    data.id_W[i])
+                                    data.id_W[i])/data.id_dtot[i]
                 temp1 = pinv(temp1)
                 self.__inv_xxsum__.update({g: temp1})
                 self.__xwsum__.update({g: temp2})
@@ -143,10 +143,11 @@ class AlphaPosterior:
                                    np.dot(data.id_Z[i],
                                    params.b[idx,:][:,np.newaxis])
                     temp2 += np.dot(data.id_W[i].T, temp4)
-                    temp3 += np.dot(data.id_X[i][:, nzro_gamma].T, temp4)
+                    temp3 += np.dot(data.id_X[i][:, nzro_gamma].T,
+                             temp4)/data.id_dtot[i]
                 temp1 += temp2 + \
                          np.dot(self.__xwsum__[g].T,
-                         np.dot(self.__inv_xxsum__[g], temp3))/data.grp_dtot[g]
+                         np.dot(self.__inv_xxsum__[g], temp3))
             else: # all gammas are 0
                 for i in data.grp_uniids[g]:
                     idx = np.where(data.uniids == i)[0][0]
@@ -226,15 +227,16 @@ class BPosterior:
                 for i in data.grp_uniids[g]:
                     idx = np.where(data.uniids == i)[0][0]
                     temp1 += np.dot(data.id_X[i][:, nzro_gamma].T,
-                                    data.id_X[i][:, nzro_gamma])
-                    temp2 += np.dot(data.id_X[i][:, nzro_gamma].T,
+                                    data.id_X[i][:, nzro_gamma])/data.id_dtot[i]
+                    temp2 += 1.0/data.id_dtot[i]* \
+                             np.dot(data.id_X[i][:, nzro_gamma].T,
                                     data.id_y[i] - \
                                     np.dot(data.id_W[i], params.alpha) - \
                                     np.dot(data.id_Z[i],
                                            params.b[idx,:][:, np.newaxis]))
                     self.__xTz__.update({i:
                                       np.dot(data.id_X[i][:, nzro_gamma].T,
-                                      data.id_Z[i])})
+                                      data.id_Z[i])/data.id_dtot[i]})
                 temp1 = pinv(temp1)
                 self.__inv_xxsum__.update({g: temp1})
                 self.__xTphi__.update({g: temp2})
@@ -249,8 +251,7 @@ class BPosterior:
                 for i in data.grp_uniids[g]:
                     V2 = np.dot(self.__xTz__[i].T,
                                 np.dot(self.__inv_xxsum__[g], self.__xTz__[i]))
-                    V2 = V2/data.grp_dtot[g] + \
-                         np.dot(data.id_Z[i].T, data.id_Z[i])
+                    V2 = V2 + np.dot(data.id_Z[i].T, data.id_Z[i])
                     V2 = V2/params.sigma2
                     np.fill_diagonal(V2, V2.diagonal() + params.lambdaD)
                     self.cov.update({i: pinv(V2)})
@@ -275,9 +276,8 @@ class BPosterior:
                                     params.b[idx,:][:, np.newaxis])
                     temp1 = np.dot(self.__xTz__[i].T,
                                    np.dot(self.__inv_xxsum__[g], temp1))
-                    temp1 = temp1/data.grp_dtot[g]
                     temp2 = data.id_y[i] - np.dot(data.id_W[i], params.alpha)-\
-                            (1.0 + 1.0/data.grp_dtot[g])*\
+                            (1.0 + 1.0/data.id_dtot[i])*\
                             np.dot(data.id_X[i][:, nzro_gamma],
                                    params.beta[gdx, nzro_gamma][:, np.newaxis])
                     temp2 = np.dot(data.id_Z[i].T, temp2)
@@ -336,14 +336,15 @@ class BetaPosterior:
         self.__nzro_gamma__ = {}
         for gdx in range(data.grp):
             g = data.unidiets[gdx]
-            nzro_gamma = params.gamma[gdx,:]!=0
+            nzro_gamma = (params.gamma[gdx,:]!=0)
             self.__nzro_gamma__.update({g: nzro_gamma})
             if nzro_gamma.any(): # not all 0's
                 temp = np.zeros([np.sum(nzro_gamma), np.sum(nzro_gamma)])
                 for i in data.grp_uniids[g]:
                     temp += np.dot(data.id_X[i][:, nzro_gamma].T,
-                                   data.id_X[i][:, nzro_gamma])
-                temp = (1.0 + 1.0/data.grp_dtot[g])*temp/params.sigma2
+                         data.id_X[i][:, nzro_gamma])* \
+                         (1.0 + 1.0/data.id_dtot[i])
+                temp = temp/params.sigma2
                 self.cov.update({g: pinv(temp)})
             else: # all gammas are 0
                 pass
@@ -358,12 +359,13 @@ class BetaPosterior:
                 temp = np.zeros([np.sum(nzro_gamma), 1])
                 for i in data.grp_uniids[g]:
                     idx = np.where(data.uniids == i)[0][0]
-                    temp += np.dot(data.id_X[i][:, nzro_gamma].T,
+                    temp += (1.0 + 1.0/data.id_dtot[i])* \
+                            np.dot(data.id_X[i][:, nzro_gamma].T,
                                    data.id_y[i] - \
                                    np.dot(data.id_W[i], params.alpha) - \
                                    np.dot(data.id_Z[i],
-                                          params.b[idx,:][:, np.newaxis]))
-                self.mean.update({g: np.dot(self.cov[g], temp)})
+                                   params.b[idx,:][:, np.newaxis]))
+                self.mean.update({g: np.dot(self.cov[g], temp)/params.sigma2})
             else: # all gammas are 0
                 pass
 
@@ -479,11 +481,11 @@ class Sigma2Posterior:
                                    params.b[idx,:][:, np.newaxis])
                     temp1 += np.dot((temp4 - np.dot(temp_x, temp_beta)).T,
                                     (temp4 - np.dot(temp_x, temp_beta)))
-                    temp2 += np.dot(temp_x.T, temp_x)
-                    temp3 += np.dot(temp_x.T, temp4)
+                    temp2 += np.dot(temp_x.T, temp_x)/data.id_dtot[i]
+                    temp3 += np.dot(temp_x.T, temp4)/data.id_dtot[i]
                 temp5 = temp_beta - np.dot(pinv(temp2), temp3)
                 self.scale += (temp1 + np.dot(temp5.T,
-                                      np.dot(temp2, temp5))/data.grp_dtot[g])
+                                      np.dot(temp2, temp5)))
             else: # all gammas are 0
                 temp1 = 0.0
                 for i in data.grp_uniids[g]:
@@ -530,6 +532,7 @@ class GammaPosterior:
         self.unidiets = data.unidiets
         self.grp_uniids = data.grp_uniids
         self.uniids = data.uniids
+        self.id_dtot = data.id_dtot
         self.alpha = params.alpha
         self.b = params.b
         self.gamma = params.gamma
@@ -555,8 +558,8 @@ class GammaPosterior:
                 temp1 = self.X[i][:, nzro_gamma]
                 temp2 = self.y[i] - np.dot(self.W[i], self.alpha) - \
                         np.dot(self.Z[i], self.b[idx,:][:, np.newaxis])
-                temp_xTx += np.dot(temp1.T, temp1)
-                temp_xTphi += np.dot(temp1.T, temp2)
+                temp_xTx += np.dot(temp1.T, temp1)*(1.0 + 1.0/self.id_dtot[i])
+                temp_xTphi += np.dot(temp1.T, temp2)*(1.0 + 1.0/self.id_dtot[i])
             return np.sqrt(1.0/det(temp_xTx))*np.exp(np.dot(temp_xTphi.T,
                    np.dot(pinv(temp_xTx), temp_xTphi))/(2.0*self.sigma2))
         else: # all gammas are 0

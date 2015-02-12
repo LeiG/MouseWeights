@@ -95,6 +95,11 @@ class WeightsData:
             self.grp_dtot.update({g: temp.size})
             # number of unique ids in a group
             self.grp_ntot.update({g: self.grp_uniids[g].size})
+        self.id_dtot = {}
+        for i in self.uniids:
+            temp = self.data['days'][self.data['id']==i]
+            # number of measurements for each ids
+            self.id_dtot.update({i: temp.size})
 
     def setParams(self, p = 2, l = 1):
         """
@@ -212,7 +217,7 @@ def mcmcrun(data, priors, dirname):
     params = temp_params.toArray(data.ntot, data.grp, data.p, data.l)
 
     # MCMC updates
-    totSimulation = 1000
+    totSimulation = 5000
     counter = 0
     while(counter < totSimulation):
         counter += 1
@@ -225,12 +230,12 @@ def mcmcrun(data, priors, dirname):
         # update beta
         beta_pd = postdist.BetaPosterior(data, temp_params)
         temp_params.beta = beta_pd.getUpdates()
-        print "====beta (control & treatment): \n{0}".format(temp_params.beta)
+        # print "====beta (control & treatment): \n{0}".format(temp_params.beta)
 
         # update alpha
         alpha_pd = postdist.AlphaPosterior(data, temp_params, priors)
         temp_params.alpha = alpha_pd.getUpdates()
-        print "====alpha: \n{0}".format(temp_params.alpha)
+        # print "====alpha: \n{0}".format(temp_params.alpha)
 
         # update lambdaD
         lambdaD_pd = postdist.LambdaDPosterior(data, temp_params, priors)
@@ -240,7 +245,7 @@ def mcmcrun(data, priors, dirname):
         # update sigma2
         sigma2_pd = postdist.Sigma2Posterior(data, temp_params)
         temp_params.sigma2 = sigma2_pd.getUpdates()
-        print "====sigma2: \n{0}".format(temp_params.sigma2)
+        # print "====sigma2: \n{0}".format(temp_params.sigma2)
 
         # update b
         b_pd = postdist.BPosterior(data, temp_params)
@@ -249,7 +254,7 @@ def mcmcrun(data, priors, dirname):
 
         # print "Mean is {0} and Cov is {1}".format(b_pd.mean, b_pd.cov)
         # print "New b's are {0}".format(temp_params.b)
-        raw_input("Press Enter to Continue ...")
+        # raw_input("Press Enter to Continue ...")
 
         # store updates
         params = np.hstack([params,

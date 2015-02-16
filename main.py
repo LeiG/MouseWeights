@@ -207,6 +207,7 @@ def mcmcrun(data, priors, dirname):
         params.setBeta(np.zeros([data.grp, data.l]))
         params.setGamma(np.zeros([data.grp, data.l]))
         params.setLambdaD(np.array(0.086).reshape(1, 1))
+        # params.setLambdaD(np.array(1.0).reshape(1, 1))
         params.setB(np.random.normal(0, np.sqrt(1.0/params.lambdaD),
                     size = data.ntot*data.p).reshape(data.ntot, data.p))
         params.setSigma2(np.array(5.06).reshape(1, 1))
@@ -217,7 +218,7 @@ def mcmcrun(data, priors, dirname):
     params = temp_params.toArray(data.ntot, data.grp, data.p, data.l)
 
     # MCMC updates
-    totSimulation = 5000
+    totSimulation = 2000
     counter = 0
     while(counter < totSimulation):
         counter += 1
@@ -225,44 +226,48 @@ def mcmcrun(data, priors, dirname):
         # update gamma
         gamma_pd = postdist.GammaPosterior(data, temp_params, priors)
         temp_params.gamma = gamma_pd.getUpdates()
-        # print temp_params.gamma.shape
 
         # update beta
         beta_pd = postdist.BetaPosterior(data, temp_params)
         temp_params.beta = beta_pd.getUpdates()
-        # print "====beta (control & treatment): \n{0}".format(temp_params.beta)
 
         # update alpha
         alpha_pd = postdist.AlphaPosterior(data, temp_params, priors)
         temp_params.alpha = alpha_pd.getUpdates()
-        # print "====alpha: \n{0}".format(temp_params.alpha)
 
         # update lambdaD
         lambdaD_pd = postdist.LambdaDPosterior(data, temp_params, priors)
         temp_params.lambdaD = lambdaD_pd.getUpdates()
-        # print temp_params.lambdaD
 
         # update sigma2
         sigma2_pd = postdist.Sigma2Posterior(data, temp_params)
         temp_params.sigma2 = sigma2_pd.getUpdates()
-        # print "====sigma2: \n{0}".format(temp_params.sigma2)
 
         # update b
         b_pd = postdist.BPosterior(data, temp_params)
         temp_params.b = b_pd.getUpdates()
-        # print temp_params.b.shape
 
-        # print "Mean is {0} and Cov is {1}".format(b_pd.mean, b_pd.cov)
-        # print "New b's are {0}".format(temp_params.b)
-        # raw_input("Press Enter to Continue ...")
+        # print out results with gaps
+        if counter % 10 == 0:
+            print "====This is the {0}th iteration...".format(counter)
+            # raw_input("Press Enter to Continue ...")
+            # print temp_params.gamma.shape
+            print "====beta (trt & ctrl): \n{0}".format(temp_params.beta)
+            print "====alpha: \n{0}".format(temp_params.alpha)
+            print "====lambdaD: \n{0}".format(temp_params.lambdaD)
+            print "====sigma2: \n{0}".format(temp_params.sigma2)
+            if int(raw_input("Do you want the results of b? Press 0/1:")):
+                # print temp_params.b.shape
+                print "===b: {0} with Cov: {1}".format(b_pd.mean, b_pd.cov[1])
+                # print "New b's are {0}".format(temp_params.b)
 
         # store updates
         params = np.hstack([params,
                 temp_params.toArray(data.ntot, data.grp, data.p, data.l)])
 
         # write to file
-        np.savetxt(dirname+"/updates.txt", params, delimiter=',')
-        # np.savetxt(dirname+"/counter.txt", counter, delimiter=',')
+        # np.savetxt(dirname+"/updates.txt", params, delimiter=',')
+        # np.savetxt(dirname+"/counter.txt", np.array([counter]), delimiter=',')
 
 
 if __name__ == '__main__':
@@ -287,6 +292,8 @@ if __name__ == '__main__':
     priors = PriorParams()
     priors.setD1(75.95)
     priors.setD2(871.47)
+    # priors.setD1(6.85)
+    # priors.setD2(5.85)
     priors.setD3(np.array([45.50, -5.75]).reshape(mousediet.p, 1))
     priors.setD4(pinv(np.array([0.04, -0.02, -0.02,
                                 0.06]).reshape(mousediet.p, mousediet.p)))

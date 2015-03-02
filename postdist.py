@@ -6,6 +6,8 @@ longitudinal Bayesian variable selection model.
 '''
 
 from __future__ import division
+
+import copy
 import numpy as np
 from numpy.linalg import pinv, det
 from scipy.stats import invgamma
@@ -211,35 +213,37 @@ class BPosterior:
         self.__uniids__ = data.uniids
         self._partialInit_(data, params)
         self._cov_(data, params)
-        self._mean_(data, params)
+        # self._mean_(data, params)
+        self.__data__ = copy.deepcopy(data)
+        self.__params__ = copy.deepcopy(params)
 
     def _partialInit_(self, data, params):
         '''Pre-calculate common components.'''
         self.__inv_xxsum__ = {}
-        self.__xTphi__ = {}
+        # self.__xTphi__ = {}
         self.__xTz__ = {}
         for gdx in range(data.grp):
             g = data.unidiets[gdx]
             nzro_gamma = (params.gamma[gdx,:]!=0)
             if nzro_gamma.any(): # not all 0's
                 temp1 = np.zeros([np.sum(nzro_gamma), np.sum(nzro_gamma)])
-                temp2 = np.zeros([np.sum(nzro_gamma), 1])
+                # temp2 = np.zeros([np.sum(nzro_gamma), 1])
                 for i in data.grp_uniids[g]:
                     idx = np.where(data.uniids == i)[0][0]
                     temp1 += np.dot(data.id_X[i][:, nzro_gamma].T,
                                     data.id_X[i][:, nzro_gamma])/data.id_dtot[i]
-                    temp2 += 1.0/data.id_dtot[i]* \
-                             np.dot(data.id_X[i][:, nzro_gamma].T,
-                                    data.id_y[i] - \
-                                    np.dot(data.id_W[i], params.alpha) - \
-                                    np.dot(data.id_Z[i],
-                                           params.b[idx,:][:, np.newaxis]))
+                    # temp2 += 1.0/data.id_dtot[i]* \
+                    #          np.dot(data.id_X[i][:, nzro_gamma].T,
+                    #                 data.id_y[i] - \
+                    #                 np.dot(data.id_W[i], params.alpha) - \
+                    #                 np.dot(data.id_Z[i],
+                    #                        params.b[idx,:][:, np.newaxis]))
                     self.__xTz__.update({i:
                                       np.dot(data.id_X[i][:, nzro_gamma].T,
                                       data.id_Z[i])/data.id_dtot[i]})
                 temp1 = pinv(temp1)
                 self.__inv_xxsum__.update({g: temp1})
-                self.__xTphi__.update({g: temp2})
+                # self.__xTphi__.update({g: temp2})
 
     def _cov_(self, data, params):
         '''Calculate covariance matrix of the posteriors.'''
@@ -262,43 +266,84 @@ class BPosterior:
                     np.fill_diagonal(V2, V2.diagonal() + params.lambdaD)
                     self.cov.update({i: pinv(V2)})
 
-    def _mean_(self, data, params):
-        '''Calculate mean of the posteriors.'''
-        self.mean = {}
-        for gdx in range(data.grp):
-            g = data.unidiets[gdx]
-            nzro_gamma = (params.gamma[gdx,:]!=0)
-            if nzro_gamma.any(): # not all 0's
-                for i in data.grp_uniids[g]:
-                    idx = np.where(data.uniids == i)[0][0]
-                    temp1 = self.__xTphi__[g].copy()
-                    temp1 += np.dot(self.__xTz__[i],
-                                    params.b[idx,:][:, np.newaxis])
-                    temp1 = np.dot(self.__xTz__[i].T,
-                                   np.dot(self.__inv_xxsum__[g], temp1))
-                    temp2 = data.id_y[i] - np.dot(data.id_W[i], params.alpha)-\
-                            (1.0 + 1.0/data.id_dtot[i])*\
-                            np.dot(data.id_X[i][:, nzro_gamma],
-                                   params.beta[gdx, nzro_gamma][:, np.newaxis])
-                    temp2 = np.dot(data.id_Z[i].T, temp2)
-                    self.mean.update({i: np.dot(self.cov[i],
-                                                (temp1+temp2)/params.sigma2)})
-            else: # all gammas are 0
-                for i in data.grp_uniids[g]:
-                    idx = np.where(data.uniids == i)[0][0]
-                    temp2 = data.id_y[i] - np.dot(data.id_W[i], params.alpha)
-                    temp2 = np.dot(data.id_Z[i].T, temp2)
-                    self.mean.update({i: np.dot(self.cov[i],
-                                                temp2/params.sigma2)})
+    # def _mean_(self, data, params):
+    #     '''Calculate mean of the posteriors.'''
+    #     self.mean = {}
+    #     for gdx in range(data.grp):
+    #         g = data.unidiets[gdx]
+    #         nzro_gamma = (params.gamma[gdx,:]!=0)
+    #         if nzro_gamma.any(): # not all 0's
+    #             for i in data.grp_uniids[g]:
+    #                 idx = np.where(data.uniids == i)[0][0]
+    #                 temp1 = self.__xTphi__[g].copy()
+    #                 temp1 += np.dot(self.__xTz__[i],
+    #                                 params.b[idx,:][:, np.newaxis])
+    #                 temp1 = np.dot(self.__xTz__[i].T,
+    #                                np.dot(self.__inv_xxsum__[g], temp1))
+    #                 temp2 = data.id_y[i] - np.dot(data.id_W[i], params.alpha)-\
+    #                         (1.0 + 1.0/data.id_dtot[i])*\
+    #                         np.dot(data.id_X[i][:, nzro_gamma],
+    #                                params.beta[gdx, nzro_gamma][:, np.newaxis])
+    #                 temp2 = np.dot(data.id_Z[i].T, temp2)
+    #                 self.mean.update({i: np.dot(self.cov[i],
+    #                                             (temp1+temp2)/params.sigma2)})
+    #         else: # all gammas are 0
+    #             for i in data.grp_uniids[g]:
+    #                 idx = np.where(data.uniids == i)[0][0]
+    #                 temp2 = data.id_y[i] - np.dot(data.id_W[i], params.alpha)
+    #                 temp2 = np.dot(data.id_Z[i].T, temp2)
+    #                 self.mean.update({i: np.dot(self.cov[i],
+    #                                             temp2/params.sigma2)})
+    #
+    # def getUpdates(self):
+    #     '''Generate random samples from the posterior dist.'''
+    #     samples = np.zeros(self.__shape__)
+    #     for idx in range(self.__shape__[0]):
+    #         i = self.__uniids__[idx]
+    #         samples[idx, :] = \
+    #             np.random.multivariate_normal(self.mean[i][:,0], self.cov[i])
+    #     return samples
+
+    def _mean_(self, idx, i, gdx, g, nzro_gamma):
+        '''Calculate mean of the posterior.'''
+        temp = np.dot(self.__data__.id_Z[i].T,
+                       self.__data__.id_y[i] - \
+                       np.dot(self.__data__.id_W[i], self.__params__.alpha)-\
+                             (1.0 + 1.0/self.__data__.id_dtot[i])*\
+                              np.dot(self.__data__.id_X[i][:, nzro_gamma],
+                        self.__params__.beta[gdx, nzro_gamma][:, np.newaxis]))
+        if nzro_gamma.any(): # not all 0's
+            temp1 = np.zeros([np.sum(nzro_gamma), 1])
+            for j in self.__data__.grp_uniids[g]:
+                jdx = np.where(self.__data__.uniids == j)[0][0]
+                temp1 += 1.0/self.__data__.id_dtot[j]* \
+                         np.dot(self.__data__.id_X[j][:, nzro_gamma].T,
+                                self.__data__.id_y[j] - \
+                                np.dot(self.__data__.id_W[j],
+                                       self.__params__.alpha) - \
+                                np.dot(self.__data__.id_Z[j],
+                                       self.__params__.b[jdx,:][:, np.newaxis]))
+            temp1 += 1.0/self.__data__.id_dtot[i]* \
+                    np.dot(self.__data__.id_X[i][:, nzro_gamma].T,
+                           np.dot(self.__data__.id_Z[i],
+                                  self.__params__.b[idx,:][:, np.newaxis]))
+            temp += np.dot(self.__xTz__[i].T,
+                          np.dot(self.__inv_xxsum__[g], temp1))
+
+        temp = np.dot(self.cov[i], temp/self.__params__.sigma2)
+        return temp
 
     def getUpdates(self):
         '''Generate random samples from the posterior dist.'''
-        samples = np.zeros(self.__shape__)
-        for idx in range(self.__shape__[0]):
-            i = self.__uniids__[idx]
-            samples[idx, :] = \
-                np.random.multivariate_normal(self.mean[i][:,0], self.cov[i])
-        return samples
+        for gdx in range(self.__data__.grp):
+            g = self.__data__.unidiets[gdx]
+            nzro_gamma = (self.__params__.gamma[gdx,:]!=0)
+            for i in self.__data__.grp_uniids[g]:
+                idx = np.where(self.__data__.uniids == i)[0][0]
+                tmp_mean = self._mean_(idx, i, gdx, g, nzro_gamma)
+                self.__params__.b[idx, :] = \
+                        np.random.multivariate_normal(tmp_mean[:,0],self.cov[i])
+        return self.__params__.b
 
 
 class BetaPosterior:

@@ -249,16 +249,16 @@ def mcmcrun(data, priors, dirname):
 
         # print out results with gaps
         if counter % 10 == 0:
-            print "====This is the {0}th iteration...".format(counter)
+            print "==== This is the {0}th iteration ====".format(counter)
             # raw_input("Press Enter to Continue ...")
-            # print temp_params.gamma.shape
             print "====beta (trt & ctrl): \n{0}".format(temp_params.beta)
             print "====alpha: \n{0}".format(temp_params.alpha)
             print "====lambdaD: \n{0}".format(temp_params.lambdaD)
             print "====sigma2: \n{0}".format(temp_params.sigma2)
             if int(raw_input("Do you want the results of b? Press 0/1:")):
                 # print temp_params.b.shape
-                print "===b: {0} with Cov: {1}".format(b_pd.mean, b_pd.cov[1])
+                print "===b: {0} with Cov: {1}".format(temp_params.b,
+                                                       b_pd.cov[1])
                 # print "New b's are {0}".format(temp_params.b)
 
         # store updates
@@ -266,8 +266,8 @@ def mcmcrun(data, priors, dirname):
                 temp_params.toArray(data.ntot, data.grp, data.p, data.l)])
 
         # write to file
-        # np.savetxt(dirname+"/updates.txt", params, delimiter=',')
-        # np.savetxt(dirname+"/counter.txt", np.array([counter]), delimiter=',')
+        np.savetxt(dirname+"/updates.txt", params, delimiter=',')
+        np.savetxt(dirname+"/counter.txt", np.array([counter]), delimiter=',')
 
 
 if __name__ == '__main__':

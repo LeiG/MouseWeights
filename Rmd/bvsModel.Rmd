@@ -1,0 +1,123 @@
+---
+title: "bvsModel"
+output: html_document
+---
+
+This R markdown file experiments the proposed longitudinal Bayesian varaible selection model with several simulated datasets. The goal is to understand how the model performs under different settings.
+
+```{r}
+# requirements
+require(MASS)
+require(reshape2)
+require(lme4)
+require(lattice)
+```
+
+First, one needs to generate a control group. To be consistent, we use the estimated parameters from the mouse weight data to mimic its behaviors.
+
+```{r}
+set.seed(3)
+
+#### parameter settings ####
+days<- c(365,395,456,517,578,639,700,760,821,882,943,1004,1065,1125,1186)
+W<- matrix(0, nrow=length(days), ncol=2)
+W[,1]<- 1
+W[,2]<- days/365 - 1 # standardize
+Z<- W
+X<- matrix(W[,2], ncol=1)
+idmatrix<- diag(length(days))
+
+#### prior settings ####
+d1 = 75.95
+d2 = 871.47
+d3 = matrix(c(45.50, -5.75), ncol=1)
+d4_inv = matrix(c(0.04, -0.02, -0.02, 0.06), nrow=2, ncol=2)
+
+#### initial values ####
+sigma2<- 5.06
+lambdaD<- 1/((9.065+14.261)/2)
+alpha<- matrix(c(45.50, -5.75), ncol=1)
+
+#### generate control grp ####
+n_contrl<- 2266
+y_contrl<- matrix(0, nrow=n_contrl, ncol=length(days))
+for(i in 1:n_contrl){
+  y_contrl[i,]<- W%*%alpha +
+                 Z%*%matrix(mvrnorm(1, matrix(0, nrow=2, ncol=1), diag(2)/rgamma(1, d1, d2)), ncol=1) +
+                 matrix(mvrnorm(1, matrix(0, nrow=length(days), ncol=1), sigma2*idmatrix), ncol=1)
+}
+
+colnames(y_contrl)<- days
+
+contrl_grp<- as.data.frame(y_contrl)
+contrl_grp$id<- as.factor(seq(1, n_contrl))
+contrl_grp$diet<- as.factor(99)
+
+## convert to long format
+contrl_grp<- melt(contrl_grp, id.vars = c('id', 'diet'), variable.name  = 'days', value.name = 'weight')
+contrl_grp<- contrl_grp[order(contrl_grp$id, contrl_grp$days), ]
+contrl_grp$days<- as.numeric(as.character(contrl_grp$days))
+contrl_grp = contrl_grp[, c("days", "id", 'diet', 'weight')]
+
+## save to file
+#write.table(contrl_grp, "../simu_control_grp.txt", quote = FALSE, row.names=FALSE)
+```
+
+Let's look at the average of weights over all generated samples across time.
+
+```{r, echo=FALSE}
+plot(days, apply(y_contrl, 2, mean), 'o', col=2, main="Time vs. Mean Weight", xlab="Time", ylab="Mean Weight")
+legend("topright", c("Control grp"), lty=1, col=2)
+```
+
+# Experiment No. 1
+
+Generate a treatment group that starts at the same initial value as the control group with a different slope.
+
+```{r}
+set.seed(3)
+
+simu_grp<- contrl_grp
+
+id_idx<- n_contrl
+diet_idx<- 1
+## add Beta params to modify Alpha
+for(beta in seq(-5, 5)){
+  ## simulate data
+  n_trt<- 1000
+  y_trt<- matrix(0, nrow=n_trt, ncol=length(days))
+  for(i in 1:n_trt){
+    y_trt[i,]<- W%*%alpha + X*beta +
+      Z%*%matrix(mvrnorm(1, matrix(0, nrow=2, ncol=1), diag(2)/rgamma(1, d1, d2)), ncol=1) +
+      matrix(mvrnorm(1, matrix(0, nrow=length(days), ncol=1), sigma2*idmatrix), ncol=1)
+    }
+  
+  colnames(y_trt)<- days
+  
+  trt_grp<- as.data.frame(y_trt)
+  trt_grp$id<- as.factor(seq(id_idx+1, id_idx+n_trt))
+  trt_grp$diet<- as.factor(diet_idx)
+  
+  id_idx = id_idx + n_trt
+  diet_idx = diet_idx + 1
+  
+  ## convert to long format
+  trt_grp<- melt(trt_grp, id.vars = c('id', 'diet'), variable.name  = 'days', value.name = 'weight')
+  trt_grp<- trt_grp[order(trt_grp$id, trt_grp$days), ]
+  trt_grp$days<- as.numeric(as.character(trt_grp$days))
+  trt_grp = trt_grp[, c("days", "id", 'diet', 'weight')]
+  
+  simu_grp<- rbind(simu_grp, trt_grp)
+}
+
+## save to file
+write.table(simu_grp, "../simu_grp.txt", quote = FALSE, row.names=FALSE)
+```
+
+Let's compare the treatment group with the control group.
+
+```{r, echo=FALSE}
+plot(days, apply(y_contrl, 2, mean), 'o', col=2, main="Time vs. Mean Weight", xlab="Time", ylab="Mean Weight")
+lines(days, apply(y_trt, 2, mean) , 'o', col=3, main="Time vs. Mean Weight", xlab="Time", ylab="Mean Weight")
+legend("topright", c("Control grp", "trt grp 1"), lty=1, col=c(2, 3))
+```

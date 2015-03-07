@@ -494,7 +494,7 @@ class GammaPosterior:
                 return temp_xTx, temp_inv_xTx1, temp_xTphi
 
     def _logProb_(self, gdx, l, gamma, *args):
-        '''Calculate unnormailized probability.'''
+        '''Calculate unnormailized log-probability.'''
         return np.log(1 - self.priors.pai[gdx])*(1 - gamma[gdx, l]) +\
                np.log(self.priors.pai[gdx])*(gamma[gdx, l]) +\
                self._logS_(gdx, l, gamma, *args)
@@ -503,68 +503,61 @@ class GammaPosterior:
         '''Calculate the S function.'''
         nzro_gamma = (gamma[gdx,:]!=0)
         g = self.data.unidiets[gdx]
-        try:
+        if len(args):
             if nzro_gamma.any(): # not all 0's
                 temp = self.phiTphi[g] - \
                        np.dot(args[0][2].T, np.dot(args[0][1], args[0][2]))
             else:
                 temp = self.phiTphi[g]
 
-            for ggdx in range(self.data.grp):
-                if ggdx != gdx:
-                    gg = self.data.unidiets[ggdx]
-                    nzro_gamma_temp = (gamma[ggdx,:]!=0)
-                    if nzro_gamma_temp.any():
-                        temp += self.phiTphi[gg] - \
-                                np.dot(self.xTphi[gg].T,
-                                np.dot(self.inv_xTx1[gg], self.xTphi[gg]))
-                    else:
-                        temp += self.phiTphi[gg]
-            temp = np.log(temp)*(-np.sum(self.data.grp_dtot.values())/2.0)
+            temp = -temp/(2*self.params.sigma2)
 
             if nzro_gamma.any():
-                temp += np.log(det(args[0][0]) + det(args[0][1]))*0.5
+                temp += (np.log(det(args[0][0])) + np.log(det(args[0][1])))*0.5
             return temp
 
-        except NameError:
+        else:
             if nzro_gamma.any(): # not all 0's
                 temp = self.phiTphi[g] - \
                        np.dot(self.xTphi[g].T,
-                       np.dot(self.inv_xTx1[g], self.xTphi[g]))
+                              np.dot(self.inv_xTx1[g], self.xTphi[g]))
             else:
                 temp = self.phiTphi[g]
 
-            for ggdx in range(self.data.grp):
-                if ggdx != gdx:
-                    gg = self.data.unidiets[ggdx]
-                    nzro_gamma_temp = (gamma[ggdx,:]!=0)
-                    if nzro_gamma_temp.any():
-                        temp += self.phiTphi[gg] - \
-                                np.dot(self.xTphi[gg].T,
-                                np.dot(self.inv_xTx1[gg], self.xTphi[gg]))
-                    else:
-                        temp += self.phiTphi[gg]
-            temp = np.log(temp)*(-np.sum(self.data.grp_dtot.values())/2.0)
+            temp = -temp/(2*self.params.sigma2)
 
             if nzro_gamma.any():
-                temp += np.log(det(self.xTx[g]) + det(self.inv_xTx1[g]))*0.5
+                temp += (np.log(det(self.xTx[g])) + \
+                         np.log(det(self.inv_xTx1[g])))*0.5
             return temp
 
     def getUpdates(self):
         for gdx in range(self.data.grp):
             if gdx != self.data.ctrlidx: # do not update control group
+                g = self.data.unidiets[gdx]
                 for l in range(self.data.l):
-                    prob = self._logProb_(gdx, l, self.params.gamma)
+                    prob = self._logProb_(gdx, l, self.params.gamma)[0, 0]
 
                     # get the opposite value of the current gamma, e.g. 0->1
                     temp_gamma = copy.deepcopy(self.params.gamma)
                     temp_gamma[gdx, l] = abs(self.params.gamma[gdx, l] - 1)
                     temp = self._varComponents_(gdx, temp_gamma, False)
-                    prob_temp = self._logProb_(gdx, l, temp_gamma, temp)
+                    prob_temp = self._logProb_(gdx,l,temp_gamma,temp)[0, 0]
 
-                    print "==== probabilities gamma ===="
-                    print "gamma={0}:{1}".format(self.params.gamma[gdx,l], prob)
-                    print "gamma={0}:{1}".format(temp_gamma[gdx,l], prob_temp)
+                    # print "==== probabilities log-gamma ===="
+                    # print "gamma={0}:{1}".format(self.params.gamma[gdx,l], prob)
+                    # print "gamma={0}:{1}".format(temp_gamma[gdx,l], prob_temp)
 
+                    prob_temp = 1.0/(1.0 + np.exp(prob - prob_temp))
+                    prob = 1.0 - prob_temp
 
+                    # update gamma
+                    if np.random.binomial(1, prob_temp, 1)[0]:
+                        self.params.gamma[gdx, l] = temp_gamma[gdx, l]
+                        try:
+                            self.xTx.update({g: copy.deepcopy(temp[0])})
+                            self.inv_xTx1.update({g: copy.deepcopy(temp[1])})
+                            self.xTphi.update({g: copy.deepcopy(temp[2])})
+                        except TypeError:
+                            pass
         return self.params.gamma

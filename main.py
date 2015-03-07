@@ -218,7 +218,7 @@ def mcmcrun(data, priors, dirname):
     params = temp_params.toArray(data.ntot, data.grp, data.p, data.l)
 
     # MCMC updates
-    totSimulation = 2000
+    totSimulation = 1000
     counter = 0
     while(counter < totSimulation):
         counter += 1
@@ -247,19 +247,17 @@ def mcmcrun(data, priors, dirname):
         b_pd = postdist.BPosterior(data, temp_params)
         temp_params.b = b_pd.getUpdates()
 
-        # print out results with gaps
-        if counter % 10 == 0:
-            print "==== This is the {0}th iteration ====".format(counter)
-            # raw_input("Press Enter to Continue ...")
-            print "====beta (trt & ctrl): \n{0}".format(temp_params.beta)
-            print "====alpha: \n{0}".format(temp_params.alpha)
-            print "====lambdaD: \n{0}".format(temp_params.lambdaD)
-            print "====sigma2: \n{0}".format(temp_params.sigma2)
-            if int(raw_input("Do you want the results of b? Press 0/1:")):
-                # print temp_params.b.shape
-                print "===b: {0} with Cov: {1}".format(temp_params.b,
-                                                       b_pd.cov[1])
-                # print "New b's are {0}".format(temp_params.b)
+        # # print out results with gaps
+        # if counter % 10 == 0:
+        #     print "==== This is the {0}th iteration ====".format(counter)
+        #     # raw_input("Press Enter to Continue ...")
+        #     print "====beta (trt & ctrl): \n{0}".format(temp_params.beta)
+        #     print "====alpha: \n{0}".format(temp_params.alpha)
+        #     print "====lambdaD: \n{0}".format(temp_params.lambdaD)
+        #     print "====sigma2: \n{0}".format(temp_params.sigma2)
+        #     if int(raw_input("Do you want the results of b? Press 0/1:")):
+        #         print "===b: {0} with Cov: {1}".format(temp_params.b,
+        #                                                b_pd.cov[1])
 
         # store updates
         params = np.hstack([params,
@@ -283,8 +281,8 @@ if __name__ == '__main__':
 
     np.random.seed(3)   #set random seed
 
-    # mousediet = WeightsData('mouse_weights_nomiss.txt', diets = [99, 27])
-    mousediet = WeightsData(datafile, diets = [99, 1], ctrlgrp = 99)
+    # mousediet = WeightsData(datafile, diets = [99, 1], ctrlgrp = 99)
+    mousediet = WeightsData(datafile, ctrlgrp = 99)
 
     mousediet.setParams(p=2, l=1)
 

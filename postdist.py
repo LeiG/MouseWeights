@@ -20,12 +20,12 @@ class ParamsHolder:
 
     Arributes
     ---------
-    setAlpha
-    setBeta
-    setGamma
-    setLambdaD
-    setB
-    setSigma2
+    updateAlpha
+    updateBeta
+    updateGamma
+    updateLambdaD
+    updateB
+    updateSigma2
 
     'toArray': 1-d np.array
         Concatenate all updated parameters into a 1-d np.array.
@@ -33,22 +33,22 @@ class ParamsHolder:
     def __init__(self):
         pass
 
-    def setAlpha(self, alpha):
+    def updateAlpha(self, alpha):
         self.alpha = alpha
 
-    def setBeta(self, beta):
+    def updateBeta(self, beta):
         self.beta = beta
 
-    def setGamma(self, gamma):
+    def updateGamma(self, gamma):
         self.gamma = gamma
 
-    def setLambdaD(self, lambdaD):
+    def updateLambdaD(self, lambdaD):
         self.lambdaD = lambdaD
 
-    def setB(self, b):
+    def updateB(self, b):
         self.b = b
 
-    def setSigma2(self, sigma2):
+    def updateSigma2(self, sigma2):
         self.sigma2 = sigma2
 
     def toArray(self, ntot, grp, p, l):
@@ -74,7 +74,7 @@ class ParamsHolder:
         sigma2_1d = self.sigma2#.reshape(1, 1)
         lambdaD_1d = self.lambdaD#.reshape(1, 1)
         return np.concatenate([gamma_1d, alpha_1d, beta_1d,
-                               lambdaD_1d, b_1d, sigma2_1d])
+                               lambdaD_1d, b_1d, sigma2_1d]).T
         # return gamma_1d # only look at gammas
 
 

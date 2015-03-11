@@ -72,7 +72,7 @@ legend("topright", c("Control grp"), lty=1, col=2)
 
 # Experiment No. 1
 
-Generate a treatment group that starts at the same initial value as the control group with a different slope.
+Generate a treatment group that starts at the same initial value as the control group with a set of different slopes (-5 to 5).
 
 ```{r}
 set.seed(3)
@@ -111,13 +111,49 @@ for(beta in seq(-5, 5)){
 }
 
 ## save to file
-write.table(simu_grp, "../simu_grp.txt", quote = FALSE, row.names=FALSE)
+write.table(simu_grp, "../simu_grp1.txt", quote = FALSE, row.names=FALSE)
 ```
 
-Let's compare the treatment group with the control group.
+# Experiment No. 2
 
-```{r, echo=FALSE}
-plot(days, apply(y_contrl, 2, mean), 'o', col=2, main="Time vs. Mean Weight", xlab="Time", ylab="Mean Weight")
-lines(days, apply(y_trt, 2, mean) , 'o', col=3, main="Time vs. Mean Weight", xlab="Time", ylab="Mean Weight")
-legend("topright", c("Control grp", "trt grp 1"), lty=1, col=c(2, 3))
+Generate a treatment group that starts at the same initial value as the control group with a set of different slopes (0 to 5).
+
+```{r}
+set.seed(3)
+
+simu_grp<- contrl_grp
+
+id_idx<- n_contrl
+diet_idx<- 1
+## add Beta params to modify Alpha
+for(beta in seq(0, 5, 0.5)){
+  ## simulate data
+  n_trt<- 1000
+  y_trt<- matrix(0, nrow=n_trt, ncol=length(days))
+  for(i in 1:n_trt){
+    y_trt[i,]<- W%*%alpha + X*beta +
+      Z%*%matrix(mvrnorm(1, matrix(0, nrow=2, ncol=1), diag(2)/rgamma(1, d1, d2)), ncol=1) +
+      matrix(mvrnorm(1, matrix(0, nrow=length(days), ncol=1), sigma2*idmatrix), ncol=1)
+    }
+  
+  colnames(y_trt)<- days
+  
+  trt_grp<- as.data.frame(y_trt)
+  trt_grp$id<- as.factor(seq(id_idx+1, id_idx+n_trt))
+  trt_grp$diet<- as.factor(diet_idx)
+  
+  id_idx = id_idx + n_trt
+  diet_idx = diet_idx + 1
+  
+  ## convert to long format
+  trt_grp<- melt(trt_grp, id.vars = c('id', 'diet'), variable.name  = 'days', value.name = 'weight')
+  trt_grp<- trt_grp[order(trt_grp$id, trt_grp$days), ]
+  trt_grp$days<- as.numeric(as.character(trt_grp$days))
+  trt_grp = trt_grp[, c("days", "id", 'diet', 'weight')]
+  
+  simu_grp<- rbind(simu_grp, trt_grp)
+}
+
+## save to file
+write.table(simu_grp, "../simu_grp2.txt", quote = FALSE, row.names=FALSE)
 ```

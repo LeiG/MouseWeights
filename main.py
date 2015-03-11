@@ -203,49 +203,51 @@ def mcmcrun(data, priors, dirname):
     def initParams(data):
         '''Initialize parameters from fitted mixed effects model in R.'''
         params = postdist.ParamsHolder()
-        params.setAlpha(np.array([45.50, -5.75]).reshape(data.p, 1))
-        params.setBeta(np.zeros([data.grp, data.l]))
-        params.setGamma(np.zeros([data.grp, data.l]))
-        params.setLambdaD(np.array(0.086).reshape(1, 1))
-        # params.setLambdaD(np.array(1.0).reshape(1, 1))
-        params.setB(np.random.normal(0, np.sqrt(1.0/params.lambdaD),
+        params.updateAlpha(np.array([45.50, -5.75]).reshape(data.p, 1))
+        params.updateBeta(np.zeros([data.grp, data.l]))
+        params.updateGamma(np.zeros([data.grp, data.l]))
+        params.updateLambdaD(np.array(0.086).reshape(1, 1))
+        params.updateB(np.random.normal(0, np.sqrt(1.0/params.lambdaD),
                     size = data.ntot*data.p).reshape(data.ntot, data.p))
-        params.setSigma2(np.array(5.06).reshape(1, 1))
+        params.updateSigma2(np.array(5.06).reshape(1, 1))
         return params
 
     # initialize parameters
     temp_params = initParams(data)
-    params = temp_params.toArray(data.ntot, data.grp, data.p, data.l)
+    with open(dirname+"/updates.txt", 'w') as f_handle:
+        np.savetxt(f_handle,
+                   temp_params.toArray(data.ntot, data.grp, data.p, data.l),
+                   delimiter=',')
 
     # MCMC updates
-    totSimulation = 1000
+    totSimulation = 5000
     counter = 0
     while(counter < totSimulation):
         counter += 1
 
         # update gamma
         gamma_pd = postdist.GammaPosterior(data, temp_params, priors)
-        temp_params.gamma = gamma_pd.getUpdates()
+        temp_params.updateGamma(gamma_pd.getUpdates())
 
         # update beta
         beta_pd = postdist.BetaPosterior(data, temp_params)
-        temp_params.beta = beta_pd.getUpdates()
-
-        # update alpha
-        alpha_pd = postdist.AlphaPosterior(data, temp_params, priors)
-        temp_params.alpha = alpha_pd.getUpdates()
+        temp_params.updateBeta(beta_pd.getUpdates())
 
         # update lambdaD
         lambdaD_pd = postdist.LambdaDPosterior(data, temp_params, priors)
-        temp_params.lambdaD = lambdaD_pd.getUpdates()
+        temp_params.updateLambdaD(lambdaD_pd.getUpdates())
 
         # update sigma2
         sigma2_pd = postdist.Sigma2Posterior(data, temp_params)
-        temp_params.sigma2 = sigma2_pd.getUpdates()
+        temp_params.updateSigma2(sigma2_pd.getUpdates())
 
         # update b
         b_pd = postdist.BPosterior(data, temp_params)
-        temp_params.b = b_pd.getUpdates()
+        temp_params.updateB(b_pd.getUpdates())
+
+        # update alpha
+        alpha_pd = postdist.AlphaPosterior(data, temp_params, priors)
+        temp_params.updateAlpha(alpha_pd.getUpdates())
 
         # # print out results with gaps
         # if counter % 10 == 0:
@@ -260,12 +262,18 @@ def mcmcrun(data, priors, dirname):
         #                                                b_pd.cov[1])
 
         # store updates
-        params = np.hstack([params,
-                temp_params.toArray(data.ntot, data.grp, data.p, data.l)])
+        # params = np.hstack([params,
+        #         temp_params.toArray(data.ntot, data.grp, data.p, data.l)])
 
         # write to file
-        np.savetxt(dirname+"/updates.txt", params, delimiter=',')
-        np.savetxt(dirname+"/counter.txt", np.array([counter]), delimiter=',')
+        # np.savetxt(dirname+"/updates.txt", params, delimiter=',')
+
+        with open(dirname+"/updates.txt", 'a') as f_handle:
+            np.savetxt(f_handle,
+                       temp_params.toArray(data.ntot, data.grp, data.p, data.l),
+                       delimiter=',')
+
+        np.savetxt(dirname+"/counter.txt", np.array([counter]))
 
 
 if __name__ == '__main__':
@@ -290,8 +298,6 @@ if __name__ == '__main__':
     priors = PriorParams()
     priors.setD1(75.95)
     priors.setD2(871.47)
-    # priors.setD1(6.85)
-    # priors.setD2(5.85)
     priors.setD3(np.array([45.50, -5.75]).reshape(mousediet.p, 1))
     priors.setD4(pinv(np.array([0.04, -0.02, -0.02,
                                 0.06]).reshape(mousediet.p, mousediet.p)))

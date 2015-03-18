@@ -39,6 +39,7 @@ xyplot(weight ~ days | id, data=contrl_subgrp,
 
 ## model fitting ##
 fm1<- lmer(weight ~ days + (days | id), data=contrl, REML=F)
+fm1<- lmer(weight ~ days + I(days^2) + (days + I(days^2) | id), data=contrl, REML=F)
 summary(fm1)
 # look for getME()
 d3<- getME(fm1, "fixef")
@@ -51,7 +52,7 @@ lambda_calc<- function(d, i){
   sd(c(ranef(fm1)$id[i,][,1],ranef(fm1)$id[i,][,2]))^(-2)
 }
 #lambda_boot<- boot(getME(fm1, "b"), lambda_calc, R=500)
-lambda_boot<- boot(ranef(fm1)$id, lambda_calc, R=500)
+lambda_boot<- boot(ranef(fm1)$id, lambda_calc, R=100)
 mean(lambda_boot$t)
 var(lambda_boot$t)
 d2<- mean(lambda_boot$t)/var(lambda_boot$t)

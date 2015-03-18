@@ -534,6 +534,7 @@ class GammaPosterior:
     def getUpdates(self):
         for gdx in range(self.data.grp):
             if gdx != self.data.ctrlidx: # do not update control group
+            # if 1: # update the control group as well
                 g = self.data.unidiets[gdx]
                 for l in range(self.data.l):
                     prob = self._logProb_(gdx, l, self.params.gamma)[0, 0]
@@ -543,10 +544,6 @@ class GammaPosterior:
                     temp_gamma[gdx, l] = abs(self.params.gamma[gdx, l] - 1)
                     temp = self._varComponents_(gdx, temp_gamma, False)
                     prob_temp = self._logProb_(gdx,l,temp_gamma,temp)[0, 0]
-
-                    # print "==== probabilities log-gamma ===="
-                    # print "gamma={0}:{1}".format(self.params.gamma[gdx,l], prob)
-                    # print "gamma={0}:{1}".format(temp_gamma[gdx,l], prob_temp)
 
                     prob_temp = 1.0/(1.0 + np.exp(prob - prob_temp))
                     prob = 1.0 - prob_temp

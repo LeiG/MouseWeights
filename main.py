@@ -101,7 +101,7 @@ class WeightsData:
             # number of measurements for each ids
             self.id_dtot.update({i: temp.size})
 
-    def setParams(self, p = 2, l = 1):
+    def setParams(self, p = 2):
         """
         Set parameters to control the complexity of the model.
 
@@ -110,11 +110,11 @@ class WeightsData:
         p: int, optional(default=2)
             The number of terms in the baseline model.
 
-        l: int, optional(default=1)
-            The number of terms in the model selection.
-
         Attributes
         ----------
+        l: int
+            The number of terms in the model selection.
+
         'id_ntot': dic
             A dic of total number of data points for each id.
 
@@ -136,7 +136,7 @@ class WeightsData:
 
         """
         self.p = p
-        self.l = l
+        self.l = p - 1
         self.id_ntot = {}
         self.id_y = {}
         self.id_W = {}
@@ -203,10 +203,17 @@ def mcmcrun(data, priors, dirname):
     def initParams(data):
         '''Initialize parameters from fitted mixed effects model in R.'''
         params = postdist.ParamsHolder()
-        params.updateAlpha(np.array([45.50, -5.75]).reshape(data.p, 1))
         params.updateBeta(np.zeros([data.grp, data.l]))
         params.updateGamma(np.zeros([data.grp, data.l]))
-        params.updateLambdaD(np.array(0.086).reshape(1, 1))
+
+        # linear
+        # params.updateAlpha(np.array([45.50, -5.75]).reshape(data.p, 1))
+        # params.updateLambdaD(np.array(0.086).reshape(1, 1))
+
+        # quadratic
+        params.updateAlpha(np.array([45.50, -3.96, -1.41]).reshape(data.p, 1))
+        params.updateLambdaD(np.array(0.047).reshape(1, 1))
+
         params.updateB(np.random.normal(0, np.sqrt(1.0/params.lambdaD),
                     size = data.ntot*data.p).reshape(data.ntot, data.p))
         params.updateSigma2(np.array(5.06).reshape(1, 1))
@@ -220,8 +227,8 @@ def mcmcrun(data, priors, dirname):
                    delimiter=',')
 
     # MCMC updates
-    totSimulation = 5000
-    counter = 0
+    totSimulation = 10000
+    counter = 1
     while(counter < totSimulation):
         counter += 1
 
@@ -292,15 +299,27 @@ if __name__ == '__main__':
     # mousediet = WeightsData(datafile, diets = [99, 1], ctrlgrp = 99)
     mousediet = WeightsData(datafile, ctrlgrp = 99)
 
-    mousediet.setParams(p=2, l=1)
-
     # set priors
     priors = PriorParams()
-    priors.setD1(75.95)
-    priors.setD2(871.47)
-    priors.setD3(np.array([45.50, -5.75]).reshape(mousediet.p, 1))
-    priors.setD4(pinv(np.array([0.04, -0.02, -0.02,
-                                0.06]).reshape(mousediet.p, mousediet.p)))
+
+    # linear
+    # mousediet.setParams(p=2)
+    # priors.setD1(171.87)
+    # priors.setD2(1678.39)
+    # priors.setD3(np.array([45.50, -5.75]).reshape(mousediet.p, 1))
+    # priors.setD4(pinv(np.array([0.04, -0.02, -0.02,
+    #                             0.06]).reshape(mousediet.p, mousediet.p)))
+    # priors.setPai(0.5*np.ones(mousediet.grp))
+
+    # quadratic
+    mousediet.setParams(p=3)
+    priors.setD1(149.34)
+    priors.setD2(2512.46)
+    priors.setD3(np.array([45.50, -3.96, -1.41]).reshape(mousediet.p, 1))
+    priors.setD4(pinv(np.array([0.04, -0.03, 0.01,
+                                -0.03, 0.19, -0.10,
+                                -0.01, -0.10, 0.09])\
+                                .reshape(mousediet.p, mousediet.p)))
     priors.setPai(0.5*np.ones(mousediet.grp))
 
     mcmcrun(mousediet, priors, dirname)

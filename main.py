@@ -17,6 +17,7 @@ import numpy as np
 from numpy.linalg import pinv
 import pandas as pd
 import postdist
+import fwsr
 
 class WeightsData:
     """
@@ -147,7 +148,8 @@ class WeightsData:
             self.id_y.update({i:
                 self.data['weight'][tracker].reshape(np.sum(tracker), 1)})
             self.id_W.update({i: self._designMatrix_(p, tracker)})
-            self.id_X.update({i: self._designMatrix_(l+1, tracker, is_X=True)})
+            self.id_X.update({i:
+                            self._designMatrix_(self.l+1,tracker,is_X=True)})
         self.id_Z = self.id_W.copy()
 
     def _designMatrix_(self, p, tracker, is_X=False):
@@ -221,15 +223,19 @@ def mcmcrun(data, priors, dirname):
 
     # initialize parameters
     temp_params = initParams(data)
+    temp_paramsArray = temp_params.toArray(data.ntot, data.grp,
+                                           data.p, data.l)
     with open(dirname+"/updates.txt", 'w') as f_handle:
         np.savetxt(f_handle,
-                   temp_params.toArray(data.ntot, data.grp, data.p, data.l),
+                   temp_paramsArray,
                    delimiter=',')
 
+    stoppingRule = fwsr.StoppingRule(temp_paramsArray, dirname, eps = 0.1)
+
     # MCMC updates
-    totSimulation = 10000
+    # totSimulation = 10000
     counter = 1
-    while(counter < totSimulation):
+    while True:
         counter += 1
 
         # update gamma
@@ -275,12 +281,18 @@ def mcmcrun(data, priors, dirname):
         # write to file
         # np.savetxt(dirname+"/updates.txt", params, delimiter=',')
 
+        temp_paramsArray = temp_params.toArray(data.ntot, data.grp,
+                                               data.p, data.l)
         with open(dirname+"/updates.txt", 'a') as f_handle:
             np.savetxt(f_handle,
-                       temp_params.toArray(data.ntot, data.grp, data.p, data.l),
+                       temp_paramsArray,
                        delimiter=',')
 
         np.savetxt(dirname+"/counter.txt", np.array([counter]))
+
+        isTerminated = stoppingRule.update(temp_paramsArray)
+        if isTerminated:
+            break
 
 
 if __name__ == '__main__':
@@ -297,7 +309,7 @@ if __name__ == '__main__':
     np.random.seed(3)   #set random seed
 
     # mousediet = WeightsData(datafile, diets = [99, 1], ctrlgrp = 99)
-    mousediet = WeightsData(datafile, ctrlgrp = 99)
+    mousediet = WeightsData(datafile, diets = [99, 36], ctrlgrp = 99)
 
     # set priors
     priors = PriorParams()

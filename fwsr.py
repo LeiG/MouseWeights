@@ -90,7 +90,7 @@ class StoppingRule:
             #             self.eps*np.sqrt(self.tankStd[2,:]/self.counter)
 
             # remove 1/n to overcome parameters that stay 0's throughout
-            self.cond = 2*self.z*self.tankMCSE + 1/(self.counter+1) -\
+            self.cond = 2*self.z*self.tankMCSE -\
                         self.eps*np.sqrt(self.tankStd[2,:]/self.counter)
 
             np.savetxt(self.dirname+"/cond.txt", self.cond)

@@ -309,7 +309,7 @@ if __name__ == '__main__':
     np.random.seed(3)   #set random seed
 
     # mousediet = WeightsData(datafile, diets = [99, 1], ctrlgrp = 99)
-    mousediet = WeightsData(datafile, diets = [99, 36], ctrlgrp = 99)
+    mousediet = WeightsData(datafile, ctrlgrp = 99)
 
     # set priors
     priors = PriorParams()

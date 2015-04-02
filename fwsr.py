@@ -25,6 +25,7 @@ class StoppingRule:
     Arributes
     ---------
     'update': Update batches with new paramsArray.
+    '_mergeTank_': Merge nearby tanks by averaing.
 
     '''
     def __init__(self, paramsArray, dirname, eps=0.1, thres=2**14, gap=20):
@@ -75,18 +76,23 @@ class StoppingRule:
             self.batchCounter = 1
             self.bSize[1] = self.bSize[0]
             self.bSize[0] = min(
-                        s for s in self.bSize if s >= np.sqrt(self.counter))
+                        s for s in self.bRange if s >= np.sqrt(self.counter))
 
             # check if batch size changes
             if self.bSize[0] != self.bSize[1]:
                 self.batch = np.zeros([self.bSize[0], self.d])
-                self.tank = self.mergeTank()
+                self.tank = self._mergeTank_()
 
             self.tankMCSE = np.std(self.tank, axis = 0)*\
                             np.sqrt(self.bSize[0]/(self.counter+1))
 
+            # self.cond = 2*self.z*self.tankMCSE + 1/(self.counter+1) -\
+            #             self.eps*np.sqrt(self.tankStd[2,:]/self.counter)
+
+            # remove 1/n to overcome parameters that stay 0's throughout
             self.cond = 2*self.z*self.tankMCSE + 1/(self.counter+1) -\
                         self.eps*np.sqrt(self.tankStd[2,:]/self.counter)
+
             np.savetxt(self.dirname+"/cond.txt", self.cond)
             if np.all(self.cond <= 0):
                 np.savetxt(self.dirname+"/posterior_mean.txt",
@@ -95,9 +101,9 @@ class StoppingRule:
 
         return False
 
-    def mergeTank(self):
+    def _mergeTank_(self):
         '''Merge nearby batches in tank.'''
         temp = np.zeros([self.tank.shape[0]/2, self.d])
-        for i in range(self.tank.shape[0]/2):
+        for i in range(int(self.tank.shape[0]/2)):
             temp[i,:] = np.mean(self.tank[(2*i):(2*(i+1)),:], axis = 0)
         return temp

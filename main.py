@@ -18,6 +18,8 @@ from numpy.linalg import pinv
 import pandas as pd
 import postdist
 import fwsr
+import statsmodels.api as sm
+from statsmodels.regression.mixed_linear_model import MixedLMParams
 
 class WeightsData:
     """
@@ -168,7 +170,12 @@ class WeightsData:
 class PriorParams:
     '''Hold the prior parameters.'''
     def __init__(self):
-        pass
+        self.d1 = None
+        self.d2 = None
+        self.d3 = None
+        self.d4 = None
+        self.pai = None
+        self.sigma2 = None
 
     def setD1(self, d1):
         self.d1 = d1
@@ -184,6 +191,10 @@ class PriorParams:
 
     def setPai(self, pai):
         self.pai = pai
+
+    def setSigma2(self, sigma2):
+        self.sigma2 = sigma2
+
 
 def mcmcrun(data, priors, dirname):
     """
@@ -209,16 +220,16 @@ def mcmcrun(data, priors, dirname):
         params.updateGamma(np.zeros([data.grp, data.l]))
 
         # linear
-        # params.updateAlpha(np.array([45.50, -5.75]).reshape(data.p, 1))
-        # params.updateLambdaD(np.array(0.086).reshape(1, 1))
+        params.updateAlpha(priors.d3)
+        params.updateLambdaD(np.array(0.086).reshape(1, 1))
 
         # quadratic
-        params.updateAlpha(np.array([45.50, -3.96, -1.41]).reshape(data.p, 1))
-        params.updateLambdaD(np.array(0.047).reshape(1, 1))
+        # params.updateAlpha(np.array([45.50, -3.96, -1.41]).reshape(data.p, 1))
+        # params.updateLambdaD(np.array(0.047).reshape(1, 1))
 
         params.updateB(np.random.normal(0, np.sqrt(1.0/params.lambdaD),
                     size = data.ntot*data.p).reshape(data.ntot, data.p))
-        params.updateSigma2(np.array(5.06).reshape(1, 1))
+        params.updateSigma2(np.array(priors.sigma2).reshape(1, 1))
         return params
 
     # initialize parameters
@@ -314,24 +325,36 @@ if __name__ == '__main__':
     # set priors
     priors = PriorParams()
 
-    # linear
-    # mousediet.setParams(p=2)
-    # priors.setD1(171.87)
-    # priors.setD2(1678.39)
-    # priors.setD3(np.array([45.50, -5.75]).reshape(mousediet.p, 1))
-    # priors.setD4(pinv(np.array([0.04, -0.02, -0.02,
-    #                             0.06]).reshape(mousediet.p, mousediet.p)))
-    # priors.setPai(0.5*np.ones(mousediet.grp))
+    ## linear
+    # estimate priors from the control group
+    mousediet.setParams(p=2)
 
-    # quadratic
-    mousediet.setParams(p=3)
-    priors.setD1(149.34)
-    priors.setD2(2512.46)
-    priors.setD3(np.array([45.50, -3.96, -1.41]).reshape(mousediet.p, 1))
-    priors.setD4(pinv(np.array([0.04, -0.03, 0.01,
-                                -0.03, 0.19, -0.10,
-                                -0.01, -0.10, 0.09])\
-                                .reshape(mousediet.p, mousediet.p)))
+    data = mousediet.rawdata[mousediet.rawdata['diet'] == 99]
+    model = sm.MixedLM.from_formula('weight ~ days', data,
+                                    re_formula='1 + days',
+                                    groups=data['id'])
+    free = MixedLMParams(2, 2)
+    free.set_fe_params(np.ones(2))
+    free.set_cov_re(np.eye(2))
+    result = model.fit(free=free)
+
+    priors.setD1(171.87)
+    priors.setD2(1678.39)
+    priors.setD3(result.fe_params.values.reshape(mousediet.p, 1))
+    priors.setD4(pinv(result.cov_params().iloc[:mousediet.p,
+                                               :mousediet.p].values))
     priors.setPai(0.5*np.ones(mousediet.grp))
+    priors.setSigma2(result.scale)
+
+    ## quadratic
+    # mousediet.setParams(p=3)
+    # priors.setD1(149.34)
+    # priors.setD2(2512.46)
+    # priors.setD3(np.array([45.50, -3.96, -1.41]).reshape(mousediet.p, 1))
+    # priors.setD4(pinv(np.array([0.04, -0.03, 0.01,
+    #                             -0.03, 0.19, -0.10,
+    #                             -0.01, -0.10, 0.09])\
+    #                             .reshape(mousediet.p, mousediet.p)))
+    # priors.setPai(0.5*np.ones(mousediet.grp))
 
     mcmcrun(mousediet, priors, dirname)

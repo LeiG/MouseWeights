@@ -265,13 +265,13 @@ def mcmcrun(data, priors, dirname):
         sigma2_pd = postdist.Sigma2Posterior(data, temp_params)
         temp_params.updateSigma2(sigma2_pd.getUpdates())
 
-        # update b
-        b_pd = postdist.BPosterior(data, temp_params)
-        temp_params.updateB(b_pd.getUpdates())
-
         # update alpha
         alpha_pd = postdist.AlphaPosterior(data, temp_params, priors)
         temp_params.updateAlpha(alpha_pd.getUpdates())
+
+        # update b
+        b_pd = postdist.BPosterior(data, temp_params)
+        temp_params.updateB(b_pd.getUpdates())
 
         # # print out results with gaps
         # if counter % 10 == 0:
@@ -338,8 +338,13 @@ if __name__ == '__main__':
     free.set_cov_re(np.eye(2))
     result = model.fit(free=free)
 
-    priors.setD1(171.87)
-    priors.setD2(1678.39)
+    # priors.setD1(171.87)
+    # priors.setD2(1678.39)
+
+    # uninformative prior
+    priors.setD1(0.001)
+    priors.setD2(0.001)
+
     priors.setD3(result.fe_params.values.reshape(mousediet.p, 1))
     priors.setD4(pinv(result.cov_params().iloc[:mousediet.p,
                                                :mousediet.p].values))

@@ -171,7 +171,7 @@ class AlphaPosterior:
                     tmp_x = data.id_X[i][:, nzro_gamma]
                     tmp1 += (np.dot(tmp_x.T,
                                     data.id_W[i]))/data.id_dtot[i]
-                    tmp2 += (np.dot(tmp_x.T, tmp_x))//data.id_dtot[i]
+                    tmp2 += (np.dot(tmp_x.T, tmp_x))/data.id_dtot[i]
                     tmp3 += (np.dot(tmp_x.T,
                             data.id_y[i] - np.dot(tmp_x,
                                 params.beta[gdx, nzro_gamma][:, np.newaxis])))/data.id_dtot[i]
@@ -339,7 +339,7 @@ class BetaPosterior:
                 tmp2 = np.zeros([np.sum(nzro_gamma), 1])
                 for i in data.grp_uniids[g]:
                     tmp_x = data.id_X[i][:, nzro_gamma]
-                    tmp1 += (np.dot(tmp_x.T, tmp_x))//data.id_dtot[i]
+                    tmp1 += (np.dot(tmp_x.T, tmp_x))/data.id_dtot[i]
                     tmp2 += (np.dot(tmp_x.T,
                             data.id_y[i] - np.dot(data.id_W[i],
                                 params.alpha)))/data.id_dtot[i]
@@ -449,7 +449,7 @@ class Sigma2Posterior:
             if nzro_gamma.any(): # not all 0's
                 temp_beta = params.beta[gdx, nzro_gamma][:, np.newaxis]
                 temp1 = 0.0
-                temp2 = np.zeros([len(temp_beta), len(temp_beta)])
+                temp2 = np.zeros([np.sum(nzro_gamma), np.sum(nzro_gamma)])
                 for i in data.grp_uniids[g]:
                     idx = np.where(data.uniids == i)[0][0]
                     temp_x = data.id_X[i][:, nzro_gamma]
@@ -459,15 +459,14 @@ class Sigma2Posterior:
                     temp1 += np.dot(temp3.T, temp3)
                 temp2 = np.dot(pinv(self.__nxTx__[g]), self.__nxTywalpha__[g])
                 self.scale += (temp1 + np.dot((temp_beta - temp2).T,
-                                      np.dot(self.__nxTx__[g],
-                                             temp_beta - temp2)))
+                                              np.dot(self.__nxTx__[g],
+                                                     temp_beta - temp2)))
             else: # all gammas are 0
                 temp1 = 0.0
                 for i in data.grp_uniids[g]:
                     idx = np.where(data.uniids == i)[0][0]
                     temp3 = data.id_y[i] - np.dot(data.id_W[i], params.alpha)-\
-                            np.dot(data.id_Z[i],
-                                   params.b[idx,:][:, np.newaxis])
+                            np.dot(data.id_Z[i], params.b[idx,:][:, np.newaxis])
                     temp1 += np.dot(temp3.T, temp3)
                 self.scale += temp1
         self.scale = self.scale/2.0
@@ -484,10 +483,10 @@ class Sigma2Posterior:
                 tmp2 = np.zeros([np.sum(nzro_gamma), 1])
                 for i in data.grp_uniids[g]:
                     tmp_x = data.id_X[i][:, nzro_gamma]
-                    tmp1 += (np.dot(tmp_x.T, tmp_x))//data.id_dtot[i]
+                    tmp1 += (np.dot(tmp_x.T, tmp_x))/data.id_dtot[i]
                     tmp2 += (np.dot(tmp_x.T,
-                            data.id_y[i] - np.dot(data.id_W[i],
-                                params.alpha)))/data.id_dtot[i]
+                                    data.id_y[i] - np.dot(data.id_W[i],
+                                                params.alpha)))/data.id_dtot[i]
                 self.__nxTx__.update({g: tmp1})
                 self.__nxTywalpha__.update({g: tmp2})
 
@@ -555,12 +554,12 @@ class GammaPosterior:
             for i in self.data.grp_uniids[g]:
                 idx = np.where(self.data.uniids == i)[0][0]
                 temp_x = self.data.id_X[i][:, nzro_gamma]
-                temp_xTx += np.dot(temp_x.T, temp_x)/self.data.grp_dtot[g]
-                temp_inv_xTx += np.dot(temp_x.T, temp_x)/self.data.grp_dtot[g]
+                temp_xTx += (np.dot(temp_x.T, temp_x))/self.data.id_dtot[i]
+                temp_inv_xTx += (np.dot(temp_x.T, temp_x))/self.data.id_dtot[i]
                 temp_inv_xTx1 += np.dot(temp_x.T, temp_x)*\
-                                 (1.0 + 1.0/self.data.grp_dtot[g])
+                                 (1.0 + 1.0/self.data.id_dtot[i])
                 temp_phi = self.data.id_y[i] - \
-                           np.dot(self.data.id_W[i], self.params.alpha)-\
+                           np.dot(self.data.id_W[i], self.params.alpha)- \
                            np.dot(self.data.id_Z[i],
                                   self.params.b[idx,:][:, np.newaxis])
                 temp_xTphi += np.dot(temp_x.T, temp_phi)

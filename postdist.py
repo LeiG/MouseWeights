@@ -128,7 +128,7 @@ class AlphaPosterior:
                 temp1 += temp2
                 temp1 += np.dot(self.__nxTw__[g].T,
                                 np.dot(pinv(self.__nxTx__[g]),
-                                       self.__nxTyxbeta__[g]))
+                                       self.__nxTphi__[g]))
             else: # all gammas are 0
                 for i in data.grp_uniids[g]:
                     idx = np.where(data.uniids == i)[0][0]
@@ -156,10 +156,10 @@ class AlphaPosterior:
         self.cov = pinv(V1)
 
     def _preCalculate_(self, data, params, priors):
-        '''Calculate 1/n*X^T*W, 1/n*x^Tx, 1/n*x^T*(y-x*beta).'''
+        '''Calculate 1/n*X^T*W, 1/n*x^Tx, phi = 1/n*x^T*(y-x*beta-z*b).'''
         self.__nxTw__ = {}
         self.__nxTx__ = {}
-        self.__nxTyxbeta__ = {}
+        self.__nxTphi__ = {}
         for gdx in range(data.grp):
             g = data.unidiets[gdx]
             nzro_gamma = (params.gamma[gdx,:]!=0)
@@ -168,16 +168,20 @@ class AlphaPosterior:
                 tmp2 = np.zeros([np.sum(nzro_gamma), np.sum(nzro_gamma)])
                 tmp3 = np.zeros([np.sum(nzro_gamma), 1])
                 for i in data.grp_uniids[g]:
+                    idx = np.where(data.uniids == i)[0][0]
                     tmp_x = data.id_X[i][:, nzro_gamma]
                     tmp1 += (np.dot(tmp_x.T,
                                     data.id_W[i]))/data.id_dtot[i]
                     tmp2 += (np.dot(tmp_x.T, tmp_x))/data.id_dtot[i]
                     tmp3 += (np.dot(tmp_x.T,
                             data.id_y[i] - np.dot(tmp_x,
-                                params.beta[gdx, nzro_gamma][:, np.newaxis])))/data.id_dtot[i]
+                                params.beta[gdx, nzro_gamma][:, np.newaxis])
+                                - np.dot(data.id_Z[i],
+                                params.b[idx,:][:, np.newaxis])))\
+                                /data.id_dtot[i]
                 self.__nxTw__.update({g: tmp1})
                 self.__nxTx__.update({g: tmp2})
-                self.__nxTyxbeta__.update({g: tmp3})
+                self.__nxTphi__.update({g: tmp3})
 
     def getUpdates(self):
         '''Generate random samples from the posterior dist.'''
@@ -211,6 +215,7 @@ class BPosterior:
     def __init__(self, data, params):
         self.__shape__ = [data.ntot, data.p]
         self.__uniids__ = data.uniids
+        self._preCalculate_(data, params)
         self._cov_(data, params)
         self._mean_(data, params)
 
@@ -219,11 +224,23 @@ class BPosterior:
         self.cov = {}
         for gdx in range(data.grp):
             g = data.unidiets[gdx]
-            for i in data.grp_uniids[g]:
-                V2 = np.dot(data.id_Z[i].T, data.id_Z[i])
-                V2 = V2/params.sigma2
-                np.fill_diagonal(V2, V2.diagonal() + params.lambdaD)
-                self.cov.update({i: pinv(V2)})
+            nzro_gamma = (params.gamma[gdx,:]!=0)
+            if nzro_gamma.any(): # not all 0's
+                for i in data.grp_uniids[g]:
+                    V2 = np.dot(data.id_Z[i].T, data.id_Z[i])
+                    tmp_xTz = np.dot(data.id_X[i].T, data.id_Z[i])
+                    V2 += np.dot(tmp_xTz.T,
+                                 np.dot(self.__inv_nxTx__[g], tmp_xTz))\
+                                 /data.id_dtot[i]**2
+                    V2 = V2/params.sigma2
+                    np.fill_diagonal(V2, V2.diagonal() + params.lambdaD)
+                    self.cov.update({i: pinv(V2)})
+            else:
+                for i in data.grp_uniids[g]:
+                    V2 = np.dot(data.id_Z[i].T, data.id_Z[i])
+                    V2 = V2/params.sigma2
+                    np.fill_diagonal(V2, V2.diagonal() + params.lambdaD)
+                    self.cov.update({i: pinv(V2)})
 
     def _mean_(self, data, params):
         '''Calculate mean of the posteriors.'''
@@ -235,11 +252,22 @@ class BPosterior:
                 for i in data.grp_uniids[g]:
                     idx = np.where(data.uniids == i)[0][0]
                     temp1 = data.id_y[i] - np.dot(data.id_W[i], params.alpha)-\
+                            (1.0+1.0/data.id_dtot[i])*\
                             np.dot(data.id_X[i][:, nzro_gamma],
                                    params.beta[gdx, nzro_gamma][:, np.newaxis])
                     temp1 = np.dot(data.id_Z[i].T, temp1)
+                    temp2 = np.dot(data.id_X[i].T, data.id_y[i] -
+                            np.dot(data.id_W[i], params.alpha))/data.id_dtot[i]
+                    for j in data.grp_uniids[g]:
+                        if j != i:
+                            jdx = np.where(data.uniids == j)[0][0]
+                            temp2 += np.dot(data.id_X[j].T, data.id_y[j] -
+                                     np.dot(data.id_W[j], params.alpha) -
+                                     np.dot(data.id_Z[j], params.b[jdx,:][:, np.newaxis]))/data.id_dtot[j]
+                    temp3 = np.dot(np.dot(data.id_Z[i].T, data.id_X[i]),
+                                   np.dot(self.__inv_nxTx__[g], temp2))/data.id_dtot[i]
                     self.mean.update({i: np.dot(self.cov[i],
-                                                temp1/params.sigma2)})
+                                                (temp1 + temp3)/params.sigma2)})
             else: # all gammas are 0
                 for i in data.grp_uniids[g]:
                     idx = np.where(data.uniids == i)[0][0]
@@ -247,6 +275,19 @@ class BPosterior:
                     temp1 = np.dot(data.id_Z[i].T, temp1)
                     self.mean.update({i: np.dot(self.cov[i],
                                                 temp1/params.sigma2)})
+
+    def _preCalculate_(self, data, params):
+        '''Calculate (1/n*x^T*x)^-1.'''
+        self.__inv_nxTx__ = {}
+        for gdx in range(data.grp):
+            g = data.unidiets[gdx]
+            nzro_gamma = (params.gamma[gdx,:]!=0)
+            if nzro_gamma.any():
+                tmp = np.zeros([np.sum(nzro_gamma), np.sum(nzro_gamma)])
+                for i in data.grp_uniids[g]:
+                    tmp_x = data.id_X[i][:, nzro_gamma]
+                    tmp += (np.dot(tmp_x.T, tmp_x))/data.id_dtot[i]
+                self.__inv_nxTx__.update({g: pinv(tmp)})
 
     def getUpdates(self):
         '''Generate random samples from the posterior dist.'''
@@ -284,7 +325,6 @@ class BetaPosterior:
     def __init__(self, data, params):
         self.__shape__ = [data.grp, data.l]
         self.__unidiets__ = data.unidiets
-        self._preCalculate_(data, params)
         self._cov_(data, params)
         self._mean_(data, params)
 
@@ -321,30 +361,11 @@ class BetaPosterior:
                                    data.id_y[i] - \
                                    np.dot(data.id_W[i], params.alpha) - \
                                    np.dot(data.id_Z[i],
-                                   params.b[idx,:][:, np.newaxis]))
-                temp += np.dot(pinv(self.__nxTx__[g]), self.__nxTywalpha__[g])
+                                   params.b[idx,:][:, np.newaxis]))*\
+                                   (1.0 + 1.0/data.id_dtot[i])
                 self.mean.update({g: np.dot(self.cov[g], temp/params.sigma2)})
             else: # all gammas are 0
                 pass
-
-    def _preCalculate_(self, data, params):
-        '''Calculate 1/n*x^Tx, 1/n*x^T*(y-w*alpha).'''
-        self.__nxTx__ = {}
-        self.__nxTywalpha__ = {}
-        for gdx in range(data.grp):
-            g = data.unidiets[gdx]
-            nzro_gamma = (params.gamma[gdx,:]!=0)
-            if nzro_gamma.any():
-                tmp1 = np.zeros([np.sum(nzro_gamma), np.sum(nzro_gamma)])
-                tmp2 = np.zeros([np.sum(nzro_gamma), 1])
-                for i in data.grp_uniids[g]:
-                    tmp_x = data.id_X[i][:, nzro_gamma]
-                    tmp1 += (np.dot(tmp_x.T, tmp_x))/data.id_dtot[i]
-                    tmp2 += (np.dot(tmp_x.T,
-                            data.id_y[i] - np.dot(data.id_W[i],
-                                params.alpha)))/data.id_dtot[i]
-                self.__nxTx__.update({g: tmp1})
-                self.__nxTywalpha__.update({g: tmp2})
 
     def getUpdates(self):
         '''Generate random samples from the posterior dist.'''
@@ -457,7 +478,7 @@ class Sigma2Posterior:
                             np.dot(temp_x, temp_beta) - np.dot(data.id_Z[i],
                                                 params.b[idx,:][:, np.newaxis])
                     temp1 += np.dot(temp3.T, temp3)
-                temp2 = np.dot(pinv(self.__nxTx__[g]), self.__nxTywalpha__[g])
+                temp2 = np.dot(pinv(self.__nxTx__[g]), self.__nxTphi__[g])
                 self.scale += (temp1 + np.dot((temp_beta - temp2).T,
                                               np.dot(self.__nxTx__[g],
                                                      temp_beta - temp2)))
@@ -472,9 +493,9 @@ class Sigma2Posterior:
         self.scale = self.scale/2.0
 
     def _preCalculate_(self, data, params):
-        '''Calculate 1/n*x^Tx, 1/n*x^T*(y -w*alpha).'''
+        '''Calculate 1/n*x^Tx, 1/n*x^T*(y - w*alpha - z*b).'''
         self.__nxTx__ = {}
-        self.__nxTywalpha__ = {}
+        self.__nxTphi__ = {}
         for gdx in range(data.grp):
             g = data.unidiets[gdx]
             nzro_gamma = (params.gamma[gdx,:]!=0)
@@ -482,13 +503,15 @@ class Sigma2Posterior:
                 tmp1 = np.zeros([np.sum(nzro_gamma), np.sum(nzro_gamma)])
                 tmp2 = np.zeros([np.sum(nzro_gamma), 1])
                 for i in data.grp_uniids[g]:
+                    idx = np.where(data.uniids == i)[0][0]
                     tmp_x = data.id_X[i][:, nzro_gamma]
                     tmp1 += (np.dot(tmp_x.T, tmp_x))/data.id_dtot[i]
                     tmp2 += (np.dot(tmp_x.T,
-                                    data.id_y[i] - np.dot(data.id_W[i],
-                                                params.alpha)))/data.id_dtot[i]
+                                    data.id_y[i] -
+                                    np.dot(data.id_W[i],params.alpha) -
+                                    np.dot(data.id_Z[i], params.b[idx,:][:, np.newaxis])))/data.id_dtot[i]
                 self.__nxTx__.update({g: tmp1})
-                self.__nxTywalpha__.update({g: tmp2})
+                self.__nxTphi__.update({g: tmp2})
 
     def getUpdates(self):
         return invgamma.rvs(a = self.a, scale = self.scale, size = 1)
@@ -523,7 +546,7 @@ class GammaPosterior:
         self.inv_xTx1 = {}  # inverse of (1+1/n)xTx
         self.phiTphi = {}
         self.xTphi = {}
-        self.xTywalpha = {}
+        self.xTphi1 = {}
         for gdx in range(self.data.grp):
             self._fixComponents_(gdx)
             self._varComponents_(gdx, self.params.gamma, True)
@@ -548,7 +571,7 @@ class GammaPosterior:
         temp_inv_xTx = np.zeros([np.sum(nzro_gamma), np.sum(nzro_gamma)])
         temp_inv_xTx1 = np.zeros([np.sum(nzro_gamma), np.sum(nzro_gamma)])
         temp_xTphi = np.zeros([np.sum(nzro_gamma), 1])
-        temp_xTywalpha = np.zeros([np.sum(nzro_gamma), 1])
+        temp_xTphi1 = np.zeros([np.sum(nzro_gamma), 1])
         g = self.data.unidiets[gdx]
         if nzro_gamma.any(): # not all 0's
             for i in self.data.grp_uniids[g]:
@@ -562,10 +585,9 @@ class GammaPosterior:
                            np.dot(self.data.id_W[i], self.params.alpha)- \
                            np.dot(self.data.id_Z[i],
                                   self.params.b[idx,:][:, np.newaxis])
-                temp_xTphi += np.dot(temp_x.T, temp_phi)
-                temp_xTywalpha += np.dot(temp_x.T,
-                    self.data.id_y[i] - np.dot(self.data.id_W[i],
-                                self.params.alpha))/self.data.id_dtot[i]
+                temp_xTphi += np.dot(temp_x.T, temp_phi)/self.data.id_dtot[i]
+                temp_xTphi1 += np.dot(temp_x.T, temp_phi)*\
+                               (1.0 + 1.0/self.data.id_dtot[i])
             temp_inv_xTx = pinv(temp_inv_xTx)
             temp_inv_xTx1 = pinv(temp_inv_xTx1)
 
@@ -574,10 +596,10 @@ class GammaPosterior:
                 self.inv_xTx.update({g: temp_inv_xTx})
                 self.inv_xTx1.update({g: temp_inv_xTx1})
                 self.xTphi.update({g: temp_xTphi})
-                self.xTywalpha.update({g: temp_xTywalpha})
+                self.xTphi1.update({g: temp_xTphi1})
             else:
                 return temp_xTx, temp_inv_xTx, temp_inv_xTx1, \
-                       temp_xTphi, temp_xTywalpha
+                       temp_xTphi, temp_xTphi1
 
     def _logProb_(self, gdx, l, gamma, *args):
         '''Calculate unnormailized log-probability.'''
@@ -592,9 +614,9 @@ class GammaPosterior:
         if len(args):
             if nzro_gamma.any(): # not all 0's
                 temp = self.phiTphi[g] + \
-                       np.dot(args[0][4].T, np.dot(args[0][1], args[0][4])) - \
-                       np.dot((args[0][3]+args[0][4]).T,
-                              np.dot(args[0][2], args[0][3]+args[0][4]))
+                       np.dot(args[0][3].T, np.dot(args[0][1], args[0][3])) - \
+                       np.dot(args[0][4].T,
+                              np.dot(args[0][2], args[0][4]))
             else:
                 temp = self.phiTphi[g]
 
@@ -607,11 +629,11 @@ class GammaPosterior:
         else:
             if nzro_gamma.any(): # not all 0's
                 temp = self.phiTphi[g] + \
-                       np.dot(self.xTywalpha[g].T,
-                              np.dot(self.inv_xTx[g], self.xTywalpha[g])) - \
-                       np.dot((self.xTphi[g]+self.xTywalpha[g]).T,
+                       np.dot(self.xTphi[g].T,
+                              np.dot(self.inv_xTx[g], self.xTphi[g])) - \
+                       np.dot(self.xTphi1[g].T,
                               np.dot(self.inv_xTx1[g],
-                                     self.xTphi[g]+self.xTywalpha[g]))
+                                     self.xTphi1[g]))
             else:
                 temp = self.phiTphi[g]
 
@@ -647,7 +669,7 @@ class GammaPosterior:
                             self.inv_xTx.update({g: copy.deepcopy(temp[1])})
                             self.inv_xTx1.update({g: copy.deepcopy(temp[2])})
                             self.xTphi.update({g: copy.deepcopy(temp[3])})
-                            self.xTywalpha.update({g: copy.deepcopy(temp[4])})
+                            self.xTphi1.update({g: copy.deepcopy(temp[4])})
                         except TypeError:
                             pass
         return self.params.gamma

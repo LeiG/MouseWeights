@@ -241,7 +241,7 @@ def mcmcrun(data, priors, dirname):
                    temp_paramsArray,
                    delimiter=',')
 
-    stoppingRule = fwsr.StoppingRule(temp_paramsArray, dirname, eps = 0.1)
+    stoppingRule = fwsr.StoppingRule(temp_paramsArray, dirname, eps = 0.2)
 
     # MCMC updates
     # totSimulation = 10000

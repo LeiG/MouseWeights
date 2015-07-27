@@ -228,7 +228,8 @@ class BPosterior:
             if nzro_gamma.any(): # not all 0's
                 for i in data.grp_uniids[g]:
                     V2 = np.dot(data.id_Z[i].T, data.id_Z[i])
-                    tmp_xTz = np.dot(data.id_X[i].T, data.id_Z[i])
+                    tmp_xTz = np.dot(data.id_X[i][:, nzro_gamma].T,
+                                     data.id_Z[i])
                     V2 += np.dot(tmp_xTz.T,
                                  np.dot(self.__inv_nxTx__[g], tmp_xTz))\
                                  /data.id_dtot[i]**2
@@ -256,15 +257,16 @@ class BPosterior:
                             np.dot(data.id_X[i][:, nzro_gamma],
                                    params.beta[gdx, nzro_gamma][:, np.newaxis])
                     temp1 = np.dot(data.id_Z[i].T, temp1)
-                    temp2 = np.dot(data.id_X[i].T, data.id_y[i] -
+                    temp2 = np.dot(data.id_X[i][:, nzro_gamma].T, data.id_y[i] -
                             np.dot(data.id_W[i], params.alpha))/data.id_dtot[i]
                     for j in data.grp_uniids[g]:
                         if j != i:
                             jdx = np.where(data.uniids == j)[0][0]
-                            temp2 += np.dot(data.id_X[j].T, data.id_y[j] -
+                            temp2 += np.dot(data.id_X[j][:, nzro_gamma].T, data.id_y[j] -
                                      np.dot(data.id_W[j], params.alpha) -
                                      np.dot(data.id_Z[j], params.b[jdx,:][:, np.newaxis]))/data.id_dtot[j]
-                    temp3 = np.dot(np.dot(data.id_Z[i].T, data.id_X[i]),
+                    temp3 = np.dot(np.dot(data.id_Z[i].T,
+                                          data.id_X[i][:, nzro_gamma]),
                                    np.dot(self.__inv_nxTx__[g], temp2))/data.id_dtot[i]
                     self.mean.update({i: np.dot(self.cov[i],
                                                 (temp1 + temp3)/params.sigma2)})

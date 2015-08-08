@@ -220,12 +220,12 @@ def mcmcrun(data, priors, dirname):
         params.updateGamma(np.zeros([data.grp, data.l]))
 
         # linear
-        params.updateAlpha(priors.d3)
-        params.updateLambdaD(np.array(0.086).reshape(1, 1))
+        # params.updateAlpha(priors.d3)
+        # params.updateLambdaD(np.array(0.086).reshape(1, 1))
 
         # quadratic
-        # params.updateAlpha(np.array([45.50, -3.96, -1.41]).reshape(data.p, 1))
-        # params.updateLambdaD(np.array(0.047).reshape(1, 1))
+        params.updateAlpha(np.array([45.50, -3.96, -1.41]).reshape(data.p, 1))
+        params.updateLambdaD(np.array(0.047).reshape(1, 1))
 
         params.updateB(np.random.normal(0, np.sqrt(1.0/params.lambdaD),
                     size = data.ntot*data.p).reshape(data.ntot, data.p))
@@ -320,26 +320,52 @@ if __name__ == '__main__':
     np.random.seed(3)   #set random seed
 
     # mousediet = WeightsData(datafile, diets = [99, 1], ctrlgrp = 99)
-    mousediet = WeightsData(datafile, ctrlgrp = 99)
+    # mousediet = WeightsData(datafile, ctrlgrp = 99)
+    mousediet = WeightsData(datafile,
+                            diets = [99, 21, 22, 23, 24, 27, 28, 29,
+                                     34, 35, 39, 42, 43, 44, 45, 48,
+                                     53, 55, 63],
+                            ctrlgrp = 99)
 
     # set priors
     priors = PriorParams()
 
     ## linear
-    # estimate priors from the control group
-    mousediet.setParams(p=2)
+    ## estimate priors from the control group
+    # mousediet.setParams(p=2)
+    #
+    # data = mousediet.rawdata[mousediet.rawdata['diet'] == 99]
+    # model = sm.MixedLM.from_formula('weight ~ days', data,
+    #                                 re_formula='1 + days',
+    #                                 groups=data['id'])
+    # free = MixedLMParams(2, 2)
+    # free.set_fe_params(np.ones(2))
+    # free.set_cov_re(np.eye(2))
+    # result = model.fit(free=free)
+    #
+    # # uninformative prior
+    # priors.setD1(0.001)
+    # priors.setD2(0.001)
+    #
+    # priors.setD3(result.fe_params.values.reshape(mousediet.p, 1))
+    # priors.setD4(pinv(result.cov_params().iloc[:mousediet.p,
+    #                                            :mousediet.p].values))
+    # priors.setPai(0.5*np.ones(mousediet.grp))
+    # priors.setSigma2(result.scale)
+
+
+    ## quadratic
+    mousediet.setParams(p=3)
 
     data = mousediet.rawdata[mousediet.rawdata['diet'] == 99]
-    model = sm.MixedLM.from_formula('weight ~ days', data,
-                                    re_formula='1 + days',
+    data['days2'] = data['days']**2
+    model = sm.MixedLM.from_formula('weight ~ days + days2', data,
+                                    re_formula='1 + days + days2',
                                     groups=data['id'])
-    free = MixedLMParams(2, 2)
-    free.set_fe_params(np.ones(2))
-    free.set_cov_re(np.eye(2))
+    free = MixedLMParams(3, 3)
+    free.set_fe_params(np.ones(3))
+    free.set_cov_re(np.eye(3))
     result = model.fit(free=free)
-
-    # priors.setD1(171.87)
-    # priors.setD2(1678.39)
 
     # uninformative prior
     priors.setD1(0.001)
@@ -351,15 +377,5 @@ if __name__ == '__main__':
     priors.setPai(0.5*np.ones(mousediet.grp))
     priors.setSigma2(result.scale)
 
-    ## quadratic
-    # mousediet.setParams(p=3)
-    # priors.setD1(149.34)
-    # priors.setD2(2512.46)
-    # priors.setD3(np.array([45.50, -3.96, -1.41]).reshape(mousediet.p, 1))
-    # priors.setD4(pinv(np.array([0.04, -0.03, 0.01,
-    #                             -0.03, 0.19, -0.10,
-    #                             -0.01, -0.10, 0.09])\
-    #                             .reshape(mousediet.p, mousediet.p)))
-    # priors.setPai(0.5*np.ones(mousediet.grp))
 
     mcmcrun(mousediet, priors, dirname)

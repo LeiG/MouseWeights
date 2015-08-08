@@ -73,8 +73,11 @@ class ParamsHolder:
         b_1d = self.b.reshape(ntot*p, 1)
         sigma2_1d = self.sigma2#.reshape(1, 1)
         lambdaD_1d = self.lambdaD#.reshape(1, 1)
+        # return np.concatenate([gamma_1d, alpha_1d, beta_1d,
+        #                        lambdaD_1d, sigma2_1d, b_1d]).T
+        # ignore random effects
         return np.concatenate([gamma_1d, alpha_1d, beta_1d,
-                               lambdaD_1d, b_1d, sigma2_1d]).T
+                               lambdaD_1d, sigma2_1d]).T
         # return gamma_1d # only look at gammas
 
 
